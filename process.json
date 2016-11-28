@@ -1,0 +1,27 @@
+{
+  "apps" : [{
+    "script"      : "paragon.js",
+    "watch"       : false,
+    "autorestart" : false,
+    "env_development": {
+      "NODE_ENV": "development",
+      "NODE_DB": "mongodb://quiverv2:quiverv2@ds019268.mlab.com:19268/quiverv2"
+    },
+    "env_playground" : {
+      "NODE_ENV": "playground",
+      "NODE_DB": "mongodb://quiverv2:quiverv2@ds019268.mlab.com:19268/quiverv2"
+    },
+    "env_testing" : {
+      "NODE_ENV": "testing",
+      "NODE_DB": "mongodb://quiverv2:quiverv2@ds019268.mlab.com:19268/quiverv2"
+    },
+    "env_codeship" : {
+      "NODE_ENV": "testing",
+      "NODE_DB": "mongodb://localhost"
+    },
+    "env_production" : {
+      "NODE_ENV": "production",
+      "NODE_DB": "mongodb://10.128.15.159/quiverv2"
+    }
+  }]
+}

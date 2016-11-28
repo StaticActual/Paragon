@@ -1,0 +1,24 @@
+{
+  "name": "paragon",
+  "version": "1.0.0",
+  "description": "Paragon is an adaptation of the Quiver and Quiver-v2 projects designed to work with Tradier Brokerage. Unlike Quiver-v2, it does not have a frontend, and instead relies on Tradier's applications to view activity.",
+  "main": "paragon.js",
+  "dependencies": {
+    "bluebird": "latest",
+    "mongodb": "~2.0.33",
+    "mongodb-core": "^1.3.16",
+    "mongoose": "latest",
+    "node-schedule": "^1.2.0",
+    "pm2": "^1.1.3",
+    "request": "^2.65.0",
+    "talib": "^1.0.2"
+  },
+  "devDependencies": {
+    "chai": "^3.5.0",
+    "mocha": "^3.2.0",
+    "nodeunit": "^0.9.1"
+  },
+  "author": "Chandler Freeman <chandler.freeman@gmail.com>",
+  "private": true,
+  "license": "UNLICENSED"
+}
