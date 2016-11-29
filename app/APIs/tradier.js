@@ -91,6 +91,34 @@ Tradier.prototype.getQuotes = function(symbolArray) {
 };
 
 /**
+ * Places a market order.
+ *
+ * @param {string} symbol - The stock symbol.
+ * @param {string} side - Either "buy" or "sell".
+ * @param {string} quantity - Number of shares.
+ * @param {boolean} [preview=false] - The preview parameter is by default set to false, which means that orders 
+    placed using this function will treated as real market orders from the account. For testing purposes, set 
+    preview to true, and the API will still return the same information, but without actually placing the order 
+    on the market. This is included for testing purposes.
+ */
+Tradier.prototype.placeMarketOrder = function(symbol, side, quantity, preview = false) {
+    var options = this.options;
+    options.form = {
+        class: "equity",
+        symbol: symbol,
+        duration: "day",
+        side: side,
+        quantity: quantity,
+        type: "market",
+        preview: preview
+    }
+    options.uri = partial_endpoints.accounts + this.account + '/orders';
+    options.method = 'POST';
+    
+    return requestPromise(options);
+};
+
+/**
  * Places a limit order.
  *
  * @param {string} symbol - The stock symbol.

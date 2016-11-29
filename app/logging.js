@@ -23,9 +23,7 @@ module.exports.log = function log(message) {
 
 module.exports.logObject = function log(object) {
     console.log('[' + Math.getTimestamp() + '] [object]');
-    for (var property in object) {
-        console.log('   - ' + property);
-    }
+    console.log(JSON.stringify(object, null, 4));
 };
 
 module.exports.logBuyOrder = function log(symbol, shares, price) {

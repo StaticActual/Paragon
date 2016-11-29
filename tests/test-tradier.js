@@ -62,8 +62,17 @@ var test_orders = co(function*() {
     var assert = Chai.assert;
     
     var orders = yield tradier.getAccountOrders();
-    // assert.property(orders, 'orders');
+    assert.property(orders, 'orders');
     Logging.log("test_get_orders [OK]");
+
+    var market_order = yield tradier.placeMarketOrder("AUY", "buy", 5, true);
+    assert.deepProperty(market_order, 'order.cost');
+    assert.deepProperty(market_order, 'order.class');
+    assert.deepProperty(market_order, 'order.quantity');
+    assert.deepProperty(market_order, 'order.side');
+    assert.deepProperty(market_order, 'order.symbol');
+    assert.deepProperty(market_order, 'order.type');
+    Logging.log("test_place_market_order [OK]");
 
     var limit_order = yield tradier.placeLimitOrder("AUY", "buy", 5, 3.00, true);
     assert.deepProperty(limit_order, 'order.cost');

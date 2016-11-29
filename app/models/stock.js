@@ -4,25 +4,13 @@
  */
 var mongoose = require('mongoose');
 
-var tradeHistorySchema = mongoose.Schema({
-  buyTime: { type: Number },
-  sellTime: { type: Number, default: 0 },
-  buyPrice: { type: Number },
-  sellPrice: { type: Number, default: 0 },
-  shares: { type: Number },
-  lowerBound: { type: Number }
-}, { timestamps: {
-  createdAt: 'created_at',
-  updatedAt: 'updated_at'}
-});
-
 var dailyStockDataSchema = mongoose.Schema({
   quotes: { type: Array, default: [] },
   MACD: { type: Array, default: [] },
   BBAND: { type: Array, default: [] },
   RSI: { type: Array, default: [] },
-  tradeHistory: [ tradeHistorySchema ],
-  lower: { type: Number, required: true }
+  divorceLowerBound: { type: Array, default: [] },
+  divorceBuffer: { type: Number, required: true }
 }, { timestamps: {
   createdAt: 'created_at',
   updatedAt: 'updated_at'}
