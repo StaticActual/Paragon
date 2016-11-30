@@ -28,7 +28,7 @@ var Mongoose = require("mongoose");
 var Config = require('../config/tradier');
 
 // The time interval at which trade() is run. One minute = 60000
-const TICK_INTERVAL = 60000;
+const TICK_INTERVAL = 30000;
 
 // The interval for trade() is run based on TICK_INTERVAL
 var tradeInterval = null;
@@ -121,6 +121,7 @@ var init = co(function*() {
     Mongoose.connect(process.env.NODE_DB);
     Logging.log('DATABASE [OK]');
     tradier = new Tradier(Config.account, Config.token);
+    tradingHours = yield getTradingHours();
 
     // Make sure the market is open today
     if (tradingHours.status === "open") {
@@ -139,7 +140,7 @@ var init = co(function*() {
     }
 
     // Set the midnight run interval
-    midnightRunInterval = schedule.scheduleJob('0 3 * * *', midnightRun);
+    midnightRunInterval = Schedule.scheduleJob('0 3 * * *', midnightRun);
 });
 
 /**
@@ -163,10 +164,9 @@ var midnightRun = co(function*(symbol) {
  * procedures, including getting symbol lists, managing data storage, and setting function intervals.
  */
 var openingBell = co(function*() {
-    Logging.log('Fetching stock list...');
+    Logging.log('=== Begin trading for ' + Math.getDate() + ' ===');
     activeSymbols = yield getWatchlistSymbols();
 
-    Logging.log('Initializing data storage...');
     for (var index in activeSymbols) {
         var symbol = activeSymbols[index];
         yield initializeDataStorageForSymbol(symbol);
@@ -182,7 +182,7 @@ var openingBell = co(function*() {
  * clearing variables and intervals.
  */
 var closingBell = co(function*() {
-    
+    Logging.log('=== End trading for ' + Math.getDate() + ' ===');
 });
 
 /**
@@ -239,7 +239,24 @@ var initializeDataStorageForSymbol = co(function*(symbol) {
 /**
  * The main function for the broker.
  */
-var trade = Promise.coroutine(function*() {
+var trade = co(function*() {
+    var updatedSymbols = yield getWatchlistSymbols();
+
+    // Bbb... Bbbbbb... Butttt Chandler, this isn't the right way to compare strings in JS! We don't need to
+    // compare them strictly, because any change in the array should trigger the refresh, so it works.
+    if (JSON.stringify(activeSymbols) !== JSON.stringify(updatedSymbols)) {
+        for (index in updatedSymbols) {
+            // If the symbol isn't in the current list
+            if (activeSymbols.indexOf(updatedSymbols[index]) === -1) {
+                initializeDataStorageForSymbol(updatedSymbols[index]);
+                Logging.log("Now actively trading " + updatedSymbols[index]);
+            }
+        }
+        activeSymbols = updatedSymbols;
+    }
+});
+
+var oldTrade = Promise.coroutine(function*() {
     for (var stock in quoteData) {
 
         // Retrieve database stock object
