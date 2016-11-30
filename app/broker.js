@@ -6,6 +6,7 @@
  * frequently for ease of use and organization.
  */
 var Promise = require('bluebird');
+var Schedule = require('node-schedule');
 var Indicators = require('./indicators');
 var Logging = require('./logging');
 var Math = require('./math');
@@ -38,9 +39,15 @@ var tradeInterval = null;
  */
 var WAKEUP_TIME = 10800000; // She says it's cold outside and she hands me my raincoat...
 
+// Contains the interval for the midnightRun() function. It is run at WAKEUP_TIME every day.
+var midnightRunInterval;
+
 // This variable holds an object that contains information about the hours for the current trading day. The
 // variable is updated according to WAKEUP_TIME every day, and holds the information for the current day.
 var tradingHours;
+
+// Timeout for openingBell() functions
+var openingBellTimeout;
 
 // The required number of quotes before trading begins.
 const REQUIRED_QUOTES = 80;
@@ -105,8 +112,8 @@ process.on('message', function(argv) {
 });
 
 /**
- * Standard initialization procedures, including getting symbol lists, managing data storage, and constructing the Tradier
- * object.
+ * Standard initialization procedures, like building the database connection and constructing the Tradier
+ * object. It also gets the current time and sets broker state accordingly.
  * 
  * @param {{NODE_DB}} process.env
  */
@@ -115,11 +122,49 @@ var init = co(function*() {
     Logging.log('DATABASE [OK]');
     tradier = new Tradier(Config.account, Config.token);
 
+    // Make sure the market is open today
+    if (tradingHours.status === "open") {
+        var currentTime = Math.getNumericalTime();
+        var marketOpenTime = Math.convertToNumericalTime(tradingHours.open.start);
+        var marketCloseTime = Math.convertToNumericalTime(tradingHours.open.end);
+
+        // If the time is between 3am and market open
+        if (WAKEUP_TIME <= currentTime && currentTime < marketOpenTime) {
+            midnightRun();
+        }
+        // If the time is between market open and one hour before market close
+        else if (marketOpenTime <= currentTime && currentTime <= (marketCloseTime - 3600000)) {
+            openingBell();
+        }
+    }
+
+    // Set the midnight run interval
+    midnightRunInterval = schedule.scheduleJob('0 3 * * *', midnightRun);
+});
+
+/**
+ * Run on schedule early every day before trading beings. It pulls down the market hours for the
+ * day and sets the interval for the start of day(coffee) function.
+ */
+var midnightRun = co(function*(symbol) {
+    Logging.log('On another midnight run...');
+    tradingHours = yield getTradingHours();
+
+    if (tradingHours.status === "open") {
+        var msTillOpen = Math.convertToNumericalTime(tradingHours.open.start) - Math.getNumericalTime();
+
+        // Run openingBell at tradingHours.open.start, or market open
+        openingBellTimeout = setTimeout(openingBell, msTillOpen);
+    }
+});
+
+/**
+ * This is the function for SoD(start of day). It runs at market open. It performs standard initialization 
+ * procedures, including getting symbol lists, managing data storage, and setting function intervals.
+ */
+var openingBell = co(function*() {
     Logging.log('Fetching stock list...');
     activeSymbols = yield getWatchlistSymbols();
-
-    Logging.log('Fetching trading hours...');
-    var tradingHours = yield getTradingHours();
 
     Logging.log('Initializing data storage...');
     for (var index in activeSymbols) {
@@ -128,35 +173,16 @@ var init = co(function*() {
         quoteData[activeSymbols[index]] = [];
     }
 
-    var currentTime = Math.getNumericalTime();
-    // If the market is closed today
-    if (tradingHours.status !== "open") {
-        // Just set the interval for 3am and wait
-    }
-    // Between 3:00am and market open
-    else if (WAKEUP_TIME <= currentTime < Math.convertToNumericalTime(tradingHours.open.start)) {
-        // Run the 3am routine and set the intervals for SoD
-    }
-    // Between market open and one hour before market close
-    else if (Math.convertToNumericalTime(tradingHours.open.start) <= currentTime < (Math.convertToNumericalTime(tradingHours.open.end) - 3600000)) {
-        // Trade!!
-    }
-    // Between 0:00 and 3:00am, After market close 
-    else {
-        // Just set the 3am interval and wait
-    }
+    tradeInterval = setInterval(trade, TICK_INTERVAL);
+    trade();
 });
 
 /**
- * Returns an array of stocks to watch from the Tradier default watchlist.
+ * This is the function for EoD(end of day). It runs at market close. It acts as a cleanup function by
+ * clearing variables and intervals.
  */
-var getWatchlistSymbols = co(function*() {
-    var watchlist = yield tradier.getDefaultWatchlist();
-    var updatedActiveSymbols = [];
-    for (index in watchlist.watchlist.items.item) {
-        updatedActiveSymbols[index] = watchlist.watchlist.items.item[index].symbol;
-    }
-    return updatedActiveSymbols;
+var closingBell = co(function*() {
+    
 });
 
 /**
@@ -171,6 +197,18 @@ var getTradingHours = co(function*() {
             return calendar.calendar.days.day[index];
         }
     }
+});
+
+/**
+ * Returns an array of stocks to watch from the Tradier default watchlist.
+ */
+var getWatchlistSymbols = co(function*() {
+    var watchlist = yield tradier.getDefaultWatchlist();
+    var updatedActiveSymbols = [];
+    for (index in watchlist.watchlist.items.item) {
+        updatedActiveSymbols[index] = watchlist.watchlist.items.item[index].symbol;
+    }
+    return updatedActiveSymbols;
 });
 
 /**
@@ -197,74 +235,6 @@ var initializeDataStorageForSymbol = co(function*(symbol) {
     });
     yield stockObject.save();
 });
-
-// Updates the broker using the market state. Start trading when open, stop when closed, etc.
-var updateMarketClock = Promise.coroutine(function*() {
-    var intradayStatus = yield new Tradier().getMarketClock();
-    if (typeof intradayStatus == 'undefined') {
-        return;
-    }
-
-    Logging.logMarketEvent('Market status: ' + intradayStatus.clock.state);
-    if (nextMarketState === 'open' && tradeInterval === null) {
-        yield loadquoteData();
-        Logging.log('Collecting initial data...');
-        tradeInterval = setInterval(trade, TICK_INTERVAL);
-        trade();
-    } else if (nextMarketState === 'postmarket') {
-        if (tradeInterval !== null) {
-            clearInterval(tradeInterval);
-        }
-        tradeInterval = null;
-        capitalAvailable = capital;
-        tradeData = {};
-        stocksOwned = 0;
-    }
-
-    // This must be run last
-    setMarketClockInterval(intradayStatus);
-});
-
-/**
- * See comment for marketClockInterval variable.
- * @param {Object[]} intradayStatus
- * @param {Object[]} intradayStatus.clock
- * @param {string} intradayStatus.clock.next_change
- * @param {string} intradayStatus.clock.next_state
- */
-function setMarketClockInterval(intradayStatus) {
-    if (marketClockInterval !== null) {
-        clearInterval(marketClockInterval);
-        marketClockInterval = null;
-    }
-
-    /*
-     Use the next_change time property to determine if the API is out of date, and if it is, then
-     wait a few minutes and try again.
-     */
-
-    /* The Tradier API is delayed by a few minutes when updating intraday market status. In order
-     * to circumvent this issue, the state of the market is stored according to the API request,
-     * and if the status stays the same, the interval is set to run 3 minutes later, until the
-     * status can be updated.
-     */
-    if (nextMarketState === null || intradayStatus.clock.state === nextMarketState) {
-        var times = intradayStatus.clock.next_change.split(':');
-        var hours = parseInt(times[0]);
-        var minutes = parseInt(times[1]);
-
-        var nextStateChange = new Date().setHours(hours, minutes, 0, 0);
-        var clock = intradayStatus.clock;
-        Logging.logMarketEvent('Next market state change @ ' + clock.next_change + ': ' + clock.next_state);
-
-        var timeUntilNextStateChange = nextStateChange - (new Date());
-        marketClockInterval = setInterval(updateMarketClock, timeUntilNextStateChange);
-        nextMarketState = intradayStatus.clock.next_state;
-    } else {
-        // 180000 milliseconds = 3 minutes
-        marketClockInterval = setInterval(updateMarketClock, 180000);
-    }
-}
 
 /**
  * The main function for the broker.
