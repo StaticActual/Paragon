@@ -26,8 +26,21 @@ var Stock = require('./models/stock');
 var Mongoose = require("mongoose");
 var Config = require('../config/tradier');
 
-// The time interval at which trader() is run. One minute = 60000.
+// The time interval at which trade() is run. One minute = 60000
 const TICK_INTERVAL = 60000;
+
+// The interval for trade() is run based on TICK_INTERVAL
+var tradeInterval = null;
+
+/** 
+ * The time at which the program updates the trading hours variable for the day. It is stored
+ * as a number representing the milliseconds since midnight.
+ */
+var WAKEUP_TIME = 10800000; // She says it's cold outside and she hands me my raincoat...
+
+// This variable holds an object that contains information about the hours for the current trading day. The
+// variable is updated according to WAKEUP_TIME every day, and holds the information for the current day.
+var tradingHours;
 
 // The required number of quotes before trading begins.
 const REQUIRED_QUOTES = 80;
@@ -71,32 +84,6 @@ var activeSymbols = [];
 var capital;
 var capitalAvailable;
 
-// trader() is run based on TRADER_INTERVAL.
-var tradeInterval = null;
-
-// This variable holds an object that contains information about the hours for the current trading day. The
-// variable is updated at 3:00am EST every day, and holds the information for the current day.
-var tradingHours;
-
-/*
- Each time the updateMarketClock() function is run, it gets a value for the next time
- the function should be run and sets this variable to a setTimeout function. For example, when
-//  updateMarketClock() is run at 4:00pm on a weekday, it might get a value saying next market
- change is at 8:00am the following morning, so it will set the timeout function to run
- updateMarketClock() again at 8:00am, which will update the interval to run at 9:30am, and so on.
- A general week day cycle looks like this:
-
- 8:00 -> premarket
- 9:30 -> market is open(starts trade() interval)
- 4:00 -> afterhours
- 6:30 -> market is closed
-
- */
-var marketClockInterval;
-
-// The next status of the market. Possible values are premarket, open, postmarket, closed and null.
-var nextMarketState = null;
-
 // The instance of Tradier that will be used to make trades.
 var tradier;
 
@@ -131,6 +118,9 @@ var init = co(function*() {
     Logging.log('Fetching stock list...');
     activeSymbols = yield getWatchlistSymbols();
 
+    Logging.log('Fetching trading hours...');
+    var tradingHours = yield getTradingHours();
+
     Logging.log('Initializing data storage...');
     for (var index in activeSymbols) {
         var symbol = activeSymbols[index];
@@ -138,8 +128,23 @@ var init = co(function*() {
         quoteData[activeSymbols[index]] = [];
     }
 
-    Logging.log('Downloading market calendar...');
-    // yield updateMarketClock();
+    var currentTime = Math.getNumericalTime();
+    // If the market is closed today
+    if (tradingHours.status !== "open") {
+        // Just set the interval for 3am and wait
+    }
+    // Between 3:00am and market open
+    else if (WAKEUP_TIME <= currentTime < Math.convertToNumericalTime(tradingHours.open.start)) {
+        // Run the 3am routine and set the intervals for SoD
+    }
+    // Between market open and one hour before market close
+    else if (Math.convertToNumericalTime(tradingHours.open.start) <= currentTime < (Math.convertToNumericalTime(tradingHours.open.end) - 3600000)) {
+        // Trade!!
+    }
+    // Between 0:00 and 3:00am, After market close 
+    else {
+        // Just set the 3am interval and wait
+    }
 });
 
 /**
@@ -155,6 +160,20 @@ var getWatchlistSymbols = co(function*() {
 });
 
 /**
+ * Returns an object containing the trading hours for the current day.
+ */
+var getTradingHours = co(function*() {
+    var calendar = yield tradier.getMarketCalendar();
+    var dateToday = Math.getDate();
+    for (var index in calendar.calendar.days.day) {
+        var day = calendar.calendar.days.day[index];
+        if (day.date === dateToday) {
+            return calendar.calendar.days.day[index];
+        }
+    }
+});
+
+/**
  * Creates a subdocument in the database for the trading day for a certain symbol.
  */
 var initializeDataStorageForSymbol = co(function*(symbol) {
@@ -164,9 +183,9 @@ var initializeDataStorageForSymbol = co(function*(symbol) {
         stockObject = new Stock({ 'symbol': symbol });
     }
 
-    // Calculate the Divorce algorithm lower bound value so we can store it for today
+    // Calculate the Divorce algorithm lower buffer value so we can store it for today
     var quote = yield tradier.getQuotes([symbol]);
-    var lower = yield SellAlgorithm.determineDivorceLower(quote.quotes.quote.low, quote.quotes.quote.high);
+    var buffer = yield SellAlgorithm.determineDivorceLower(quote.quotes.quote.low, quote.quotes.quote.high);
 
     // Create a subdocument for today's trading
     stockObject.data.push({
@@ -174,7 +193,7 @@ var initializeDataStorageForSymbol = co(function*(symbol) {
         MACD: [],
         BBAND: [],
         RSI: [],
-        lower: lower
+        divorceBuffer: buffer
     });
     yield stockObject.save();
 });

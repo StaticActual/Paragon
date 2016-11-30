@@ -97,3 +97,27 @@ module.exports.getDate = function() {
 
     return yyyy + '-' + mm + '-' + dd;
 };
+
+/**
+ * Returns the current time in milliseconds since 12:00am(the start of the day)
+ * 
+ * Taken from http://stackoverflow.com/questions/10944396/how-to-calculate-ms-since-midnight-in-javascript
+ */ 
+module.exports.getNumericalTime = function() {
+    var d = new Date();
+    var e = new Date(d);
+    return d - e.setHours(0,0,0,0);
+};
+
+/**
+ * Returns the time in milliseconds since 12:00am for the given string
+ * 
+ * @param {string[]} time - A string representing the time in 24 format as "hr:mm". This includes 0's, ex. "09:00"
+ */
+module.exports.convertToNumericalTime = function(time) {
+    var timeValues = time.split(":");
+    var hours = parseInt(timeValues[0]);
+    var minutes = parseInt(timeValues[1])
+
+    return (hours * 3600000) + (minutes * 60000);
+};
