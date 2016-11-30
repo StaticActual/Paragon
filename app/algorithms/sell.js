@@ -10,8 +10,23 @@ var Indicators = require('../indicators');
 const ADRMultiplier = 0.0485;
 const Offset = 0.01;
 
-module.exports.determineSellSignals = function(parameter) {
-    // Insert divorce algorithm here
+/**
+ * Reads indicators and determines buy suitability. Returns true if stock is ready to sell, returns the
+ * new lower bound value otherwise.
+ */
+module.exports.determineSell = function(quote, stockData) {
+    // If the quote is equal to or less than the lower bound, return a sell signal
+    if (quote <= stockData.lowerBound) {
+        return true;
+    }
+    // Otherwise, if the quote is greater than the lower bound, raise it accordingly
+    else if (quote > stockData.lowerBound) {
+        var newLower = quote - stockData.divorceBuffer;
+        if (newLower > stockData.lowerBound) {
+            return newLower;
+        }
+        return stockData.lowerBound;
+    }
 };
 
 /**

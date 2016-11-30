@@ -7,7 +7,6 @@
  */
 var Promise = require('bluebird');
 var Schedule = require('node-schedule');
-var Indicators = require('./indicators');
 var Logging = require('./logging');
 var Math = require('./math');
 var Playground = require('./playground');
@@ -33,9 +32,15 @@ const TICK_INTERVAL = 30000;
 // The interval for trade() is run based on TICK_INTERVAL
 var tradeInterval = null;
 
+// TRADing rEadyness CONdition. See Trello for documentation.
+var TRADECON = 5;
+
 /** 
  * The time at which the program updates the trading hours variable for the day. It is stored
  * as a number representing the milliseconds since midnight.
+ * 
+ * This is also a constant that is represented in other ways throughout the program. So don't
+ * change it.
  */
 var WAKEUP_TIME = 10800000; // She says it's cold outside and she hands me my raincoat...
 
@@ -170,7 +175,6 @@ var openingBell = co(function*() {
     for (var index in activeSymbols) {
         var symbol = activeSymbols[index];
         yield initializeDataStorageForSymbol(symbol);
-        quoteData[activeSymbols[index]] = [];
     }
 
     tradeInterval = setInterval(trade, TICK_INTERVAL);
@@ -234,10 +238,13 @@ var initializeDataStorageForSymbol = co(function*(symbol) {
         divorceBuffer: buffer
     });
     yield stockObject.save();
+
+    // Ensure the symbol is in our local object as well
+    quoteData[symbol] = [];
 });
 
 /**
- * The main function for the broker.
+ * Where the magic happens.
  */
 var trade = co(function*() {
     var updatedSymbols = yield getWatchlistSymbols();
@@ -254,133 +261,80 @@ var trade = co(function*() {
         }
         activeSymbols = updatedSymbols;
     }
-});
 
-var oldTrade = Promise.coroutine(function*() {
-    for (var stock in quoteData) {
+    var quotes = yield tradier.getQuotes(activeSymbols);
+    for (var index in activeSymbols) {
+        var symbol = activeSymbols[index];
+        var quote = quotes.quotes.quote[index].last.toFixed(2);
+        var stockObject = yield Stock.findOne({ 'symbol': symbol });
 
-        // Retrieve database stock object
-        var stockObject = yield Stock.findOne({ 'symbol': stock });
+        // Store the new quote price in the local variable and the database
+        quoteData[symbol].push(quote);
+        stockObject.data[stockObject.data.length - 1].quotes.push(quote);
 
-        // Retrieve quote
-        var quote = yield RobinhoodInterface.getQuote(stock);
-        if (!quote) {
-            quoteData[stock].push(null);
-            stockObject.data[stockObject.data.length - 1].quotes.push(null);
+        var indicators = BuyAlgorithm.calculateIndicators(quoteData[symbol]);
+        var divorceLowerValue = null;
+
+        // If we don't have enough data to calculate indicators yet, we can just store the null
+        // values and skip this symbol
+        if (indicators === null) {
             stockObject.data[stockObject.data.length - 1].MACD.push(null);
             stockObject.data[stockObject.data.length - 1].BBAND.push(null);
             stockObject.data[stockObject.data.length - 1].RSI.push(null);
+            stockObject.data[stockObject.data.length - 1].divorceLowerBound.push(null);
 
-            /* Save the stock object to the db */
             yield stockObject.save();
             continue;
         }
+            
+        // If we don't already own the stock, look for buy indicators
+        if (!tradeData.hasOwnProperty(stock) && stocksOwned < MAX_OWNED) {
+            if (BuyAlgorithm.determineBuy(indicators) === true) {
+                var shares = AllocationAlgorithm.getShares(capitalAvailable, quote);
+                if (shares > 0) {
+                    tradier.placeLimitOrder(symbol, "buy", shares, quote);
 
-        // Store quote in database object for this session
-        quoteData[stock].push(quote);
-        stockObject.data[stockObject.data.length - 1].quotes.push(quote);
-
-        // Stock data point
-        var MACD, BBAND, RSI;
-
-        // If the number of required data points has been met
-        if (quoteData[stock].length > REQUIRED_QUOTES) {
-
-            /* Calculate our indicators for the algorithm */
-            MACD = yield Indicators.MACD(quoteData[stock]);
-            BBAND = yield Indicators.BBANDS(quoteData[stock]);
-            RSI = yield Indicators.RSI(quoteData[stock]);
-
-            /* Store the indicators in the database object */
-            stockObject.data[stockObject.data.length - 1].MACD.push(MACD);
-            stockObject.data[stockObject.data.length - 1].BBAND.push(BBAND);
-            stockObject.data[stockObject.data.length - 1].RSI.push(RSI);
-
-            // If we don't own the stock, look to buy
-            if (!tradeData.hasOwnProperty(stock) && stocksOwned < MAX_OWNED) {
-
-                /* If the indicator test passes, we buy */
-                if (MACD.MACD > 0 && MACD.MACD > MACD.signal && BBAND.high > quote && RSI >= RSICutoff) {
-
-                    // Calculate the total number of shares that can be purchased
-                    var shares = AllocationAlgorithm.getShares(capitalAvailable, quote);
-                    if (shares > 0) {
-
-                        /* Place the buy order */
-                        var buyOrder = yield RobinhoodInterface.marketOrder(robinhoodUser, 'buy', stock, quote, shares);
-                        if (!buyOrder) {
-                            continue;
-                        }
-
-                        Logging.logBuyOrder(stock, shares, price);
-                        capitalAvailable -= Math.ceil(quote * shares);
-                        var buyTimeNumber = quoteData[stock].length - 1;
-                        var lower = (quote - stockObject.data.lower).toFixed(2);
-                        tradeData[stock] = {
-                            buyTime: buyTimeNumber,
-                            buyPrice: quote,
-                            shares: shares,
-                            lowerBound: lower
-                        };
-
-                        /* Store the sell points in the database */
-                        stockObject.data[stockObject.data.length - 1].tradeHistory.push(tradeData[stock]);
-                        stocksOwned++;
-                    }
+                    var divorceLowerStart = quote - stockObject.data.divorceBuffer;
+                    tradeData[symbol] = {
+                        purchasePrice: quote,
+                        shares: shares,
+                        lowerBound: divorceLowerStart,
+                        divorceBuffer: stockObject.data.divorceBuffer
+                    };
                 }
             }
-
-            // If we do own the stock, manage the lower bound and look to sell
-            else if (tradeData.hasOwnProperty(stock)) {
-
-                // Get the trade history for the stock
-                var tradeHistory = stockObject.data[stockObject.data.length - 1].tradeHistory;
-
-                // If the quote is equal to or less than the lower bound, sell
-                if (quote <= tradeData[stock].lowerBound) {
-
-                    /* Place sell order */
-                    var sellOrder = yield RobinhoodInterface.marketOrder(robinhoodUser, 'sell', stock, quote, tradeData[stock].shares);
-                    if (!sellOrder) {
-                        continue;
-                    }
-
-                    Logging.logSellOrder(stock, tradeData[stock].shares, tradeData[stock].buyPrice, quote);
-                    tradeHistory[tradeHistory.length - 1].sellTime = quoteData[stock].length - 1;
-                    tradeHistory[tradeHistory.length - 1].sellPrice = quote;
-
-                    delete tradeData[stock];
-                    stocksOwned--;
-                }
-
-                // Otherwise, if the quote is greater than the lower bound, raise it accordingly
-                else if (quote > tradeData[stock].lowerBound) {
-                    var newLower = (quote - stockObject.data.lower).toFixed(2);
-                    if (newLower > tradeData[stock].lowerBound) {
-                        tradeData[stock].lowerBound = newLower;
-                        tradeHistory[tradeHistory.length - 1].lowerBound = newLower;
-                    }
-                }
-
-                // Save the trade data for the stock
-                stockObject.data[stockObject.data.length - 1].tradeHistory = tradeHistory;
+        }
+        // If we already own the stock, let the sell algorithm work
+        else if (tradeData.hasOwnProperty(symbol)) {
+            var sellSignal = SellAlgorithm.determineSell(quote, tradeData[symbol]);
+            if (sellSignal === true) {
+                tradier.placeMarketOrder(symbol, "sell", shares);
+                delete tradeData[symbol];
+            }
+            else {
+                var lower = sellSignal;
+                tradeData[symbol].lowerBound = lower;
+                divorceLowerValue = lower;
             }
         }
 
-        // If the indicators weren't set, make them null data points
-        if (!MACD) {
-            stockObject.data[stockObject.data.length - 1].MACD.push(null);
-        }
-        if (!BBAND) {
-            stockObject.data[stockObject.data.length - 1].BBAND.push(null);
-        }
-        if (!RSI) {
-            stockObject.data[stockObject.data.length - 1].RSI.push(null);
-        }
+        stockObject.data[stockObject.data.length - 1].MACD.push(indicators.MACD);
+        stockObject.data[stockObject.data.length - 1].BBAND.push(indicators.BBAND);
+        stockObject.data[stockObject.data.length - 1].RSI.push(indicators.RSI);
+        stockObject.data[stockObject.data.length - 1].divorceLowerBound.push(divorceLowerValue);
 
-        /* Save the stock object to the db */
         yield stockObject.save();
     }
+
+    // At the end of trade()
+    // at < ten minutes to market close
+        // firesale
+        // return
+    // at < 30 minutes to market close
+        // if we own shares or have pending buy orders
+            // set tradecon to 4
+        // else
+            // clear trade interval / cleanup
 });
 
 /**
