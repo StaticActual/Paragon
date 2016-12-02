@@ -42,6 +42,7 @@ var TRADECON = 5;
  * This is also a constant that is represented in other ways throughout the program. So don't
  * change it.
  */
+
 var WAKEUP_TIME = 10800000; // She says it's cold outside and she hands me my raincoat...
 
 // Contains the interval for the midnightRun() function. It is run at WAKEUP_TIME every day.
@@ -84,7 +85,6 @@ var quoteData = {};
  * Stocks will only exist in this Object if they have been purchased.
  */
 var tradeData = {};
-var stocksOwned = 0;
 
 /**
  * The array of symbols currently being traded.
@@ -145,7 +145,7 @@ var init = co(function*() {
     }
 
     // Set the midnight run interval
-    midnightRunInterval = Schedule.scheduleJob('0 3 * * *', midnightRun);
+    midnightRunInterval = Schedule.scheduleJob('0 0 * * *', midnightRun);
 });
 
 /**
@@ -288,7 +288,7 @@ var trade = co(function*() {
         }
             
         // If we don't already own the stock, look for buy indicators
-        if (!tradeData.hasOwnProperty(stock) && stocksOwned < MAX_OWNED) {
+        if (TRADECON === 5 && !tradeData.hasOwnProperty(stock)) {
             if (BuyAlgorithm.determineBuy(indicators) === true) {
                 var shares = AllocationAlgorithm.getShares(capitalAvailable, quote);
                 if (shares > 0) {
@@ -305,7 +305,7 @@ var trade = co(function*() {
             }
         }
         // If we already own the stock, let the sell algorithm work
-        else if (tradeData.hasOwnProperty(symbol)) {
+        else if ((TRADECON === 5 || TRADECON === 4) && tradeData.hasOwnProperty(symbol)) {
             var sellSignal = SellAlgorithm.determineSell(quote, tradeData[symbol]);
             if (sellSignal === true) {
                 tradier.placeMarketOrder(symbol, "sell", shares);
@@ -326,16 +326,45 @@ var trade = co(function*() {
         yield stockObject.save();
     }
 
-    // At the end of trade()
-    // at < ten minutes to market close
-        // firesale
-        // return
-    // at < 30 minutes to market close
-        // if we own shares or have pending buy orders
-            // set tradecon to 4
-        // else
-            // clear trade interval / cleanup
+    var currentTime = Math.getNumericalTime();
+    var marketCloseTime = Math.convertToNumericalTime(tradingHours.open.end);
+    if (currentTime >= marketCloseTime) {
+        cleanup();
+        return;
+    }
+    else if (TRADECON !== 6 && currentTime >= (marketCloseTime - 600000)) {
+        firesale();
+    }
+    else if (currentTime >= (marketCloseTime - 1800000)) {
+        // TODO: INCLUDE PENDING BUY ORDERS
+        if (TRADECON !== 4 && Object.keys(tradeData).length > 0) {
+            TRADECON = 4;
+        }
+        else {
+            TRADECON = 6;
+        }
+    }   
 });
+
+/**
+ * Initiates a TRADECON 3 status. Places sell orders on all existing positions and 
+ */
+function firesale() {
+    TRADECON = 3;
+    // sell all held positions
+    // cancel pending buy orders
+}
+
+/**
+ * A syncronous function that cleans up all of our variables after the trading day.
+ */
+function cleanup() {
+    clearInterval(tradeInterval);
+    TRADECON = 5;
+    quoteData = {};
+    tradeData = {};
+    activeSymbols = [];
+}
 
 /**
  * Coroutine wrapper
