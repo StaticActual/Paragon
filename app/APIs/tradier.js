@@ -63,6 +63,28 @@ Tradier.prototype.getAccountPositions = function() {
 };
 
 /**
+ * Get status of specific order by id.
+ */
+Tradier.prototype.getOrderStatus = function(id) {
+    var options = this.options;
+    options.url = partial_endpoints.accounts + this.account + '/orders/' + id;
+    options.method = 'GET';
+    
+    return requestPromise(options);
+};
+
+/**
+ * Cancel an order by id.
+ */
+Tradier.prototype.cancelOrder = function(id) {
+    var options = this.options;
+    options.url = partial_endpoints.accounts + this.account + '/orders/' + id;
+    options.method = 'DELETE';
+    
+    return requestPromise(options);
+};
+
+/**
  * Gets all pending orders on an account.
  */
 Tradier.prototype.getAccountOrders = function() {

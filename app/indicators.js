@@ -2,8 +2,8 @@
  * Created by Chandler Freeman on 3/3/16.
  */
 var Promise = require('bluebird');
-var talib = require('talib');
-var math = require('./math');
+var Talib = require('talib');
+var MathHelper = require('./katherine');
 
 module.exports = {};
 
@@ -20,7 +20,7 @@ module.exports = {};
  */
 module.exports.MACD = function(quotes) {
   var promise = new Promise(function(resolve, reject) {
-    talib.execute({
+    Talib.execute({
       name: "MACD",
       startIdx: 0,
       endIdx: quotes.length - 1,
@@ -54,7 +54,7 @@ module.exports.MACD = function(quotes) {
  */
 module.exports.BBANDS = function(quotes) {
   var promise = new Promise(function(resolve, reject) {
-    talib.execute({
+    Talib.execute({
       name: "BBANDS",
       startIdx: 0,
       endIdx: quotes.length - 1,
@@ -84,7 +84,7 @@ module.exports.BBANDS = function(quotes) {
  */
 module.exports.RSI = function(quotes) {
   var promise = new Promise(function(resolve, reject) {
-    talib.execute({
+    Talib.execute({
       name: "RSI",
       startIdx: 0,
       endIdx: quotes.length - 1,
@@ -106,10 +106,10 @@ module.exports.RSI = function(quotes) {
  */
 module.exports.ADR = function(min, max) {
   var promise = new Promise(function(resolve, reject) {
-    var minCents = math.convertToIntegerCents(min);
-    var maxCents = math.convertToIntegerCents(max);
+    var minCents = MathHelper.convertToIntegerCents(min);
+    var maxCents = MathHelper.convertToIntegerCents(max);
     var ADR = Math.ceil((maxCents - minCents) / 2);
-    resolve(math.convertToFloatDollars(ADR));
+    resolve(MathHelper.convertToFloatDollars(ADR));
   });
   return promise;
 };

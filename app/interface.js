@@ -7,7 +7,7 @@
  * and makes sure the Robinhood API client can be used by other projects.
  */
 var Promise = require('bluebird');
-var Math = require('./math');
+var MathHelper = require('./katherine');
 var Logging = require('./logging');
 
 module.exports = {};
@@ -24,14 +24,14 @@ module.exports.marketOrder = Promise.coroutine(function*(robinhoodUser, side, st
   var order = {};
   order.account = yield robinhoodUser.getAccount();
   if (!order.account.hasOwnProperty('buying_power')) {
-    Logging.log(Math.getTimestamp() + ' -> Retrieving Robinhood account failed! Skipping' +
+    Logging.log(MathHelper.getTimestamp() + ' -> Retrieving Robinhood account failed! Skipping' +
         ' trade: ');
     Logging.log(order.account);
     return;
   }
   order.instrument = yield robinhoodUser.getInstrument(stock);
   if (!order.instrument) {
-    Logging.log(Math.getTimestamp() + ' -> Retrieving instrument for ' + stock + ' failed!' +
+    Logging.log(MathHelper.getTimestamp() + ' -> Retrieving instrument for ' + stock + ' failed!' +
         ' Skipping trade...');
     return;
   }
@@ -44,7 +44,7 @@ module.exports.marketOrder = Promise.coroutine(function*(robinhoodUser, side, st
     return orderStatus.state;
   }
   else {
-    Logging.log(Math.getTimestamp() + ' -> Order failed for ' + stock + ': (' + [side, quote, shares].join(', ') + ')');
+    Logging.log(MathHelper.getTimestamp() + ' -> Order failed for ' + stock + ': (' + [side, quote, shares].join(', ') + ')');
   }
 });
 
@@ -54,7 +54,7 @@ module.exports.marketOrder = Promise.coroutine(function*(robinhoodUser, side, st
 module.exports.getBuyPower = Promise.coroutine(function*(robinhoodUser) {
   var account = yield robinhoodUser.getAccount();
   if (!account.buying_power) {
-    Logging.log(Math.getTimestamp() + ' -> Retrieving Robinhood account failed! Skipping...');
+    Logging.log(MathHelper.getTimestamp() + ' -> Retrieving Robinhood account failed! Skipping...');
     Logging.log(account);
     return;
   }
@@ -67,7 +67,7 @@ module.exports.getBuyPower = Promise.coroutine(function*(robinhoodUser) {
 module.exports.getFundamentals = Promise.coroutine(function*(robinhoodUser, stock) {
   var fundamentals = yield robinhoodUser.getFundamentals(stock);
   if (!fundamentals) {
-    Logging.log(Math.getTimestamp() + ' -> Retrieving fundamentals for '  + stock + ' failed!' +
+    Logging.log(MathHelper.getTimestamp() + ' -> Retrieving fundamentals for '  + stock + ' failed!' +
         ' Skipping...');
     return;
   }

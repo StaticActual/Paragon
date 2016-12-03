@@ -1,27 +1,24 @@
 /**
  * Created by Chandler Freeman on 11/28/16.
  */
-var Math = require('../math');
+var MathHelper = require('../katherine');
+
+/**
+ * Algorithm constants
+ */
+const percentOfNetValuePerTrade = 0.03;
 
 /**
  * Returns the number of shares the user can purchase, given the current price.
  */
-module.exports.getShares = function(capital, quote) {
-    var buyingPowerCents = Math.convertToIntegerCents(capital);
-    var quoteCents = Math.convertToIntegerCents(quote);
-    var funds = buyingPowerCents / (MAX_OWNED - stocksOwned);
+module.exports.getShares = function(netCapital, tradingCapital, quote) {
+    var funds = percentOfNetValuePerTrade * netCapital;
+    return Math.floor(funds / quote);
+};
 
-    // Logging.logBuyOrder(stock, shares, price);
-    // capitalAvailable -= Math.ceil(quote * shares);
-    // var buyTimeNumber = quoteData[stock].length - 1;
-    // var lower = (quote - stockObject.data.lower).toFixed(2);
-    // tradeData[stock] = {
-    //     buyTime: buyTimeNumber,
-    //     buyPrice: quote,
-    //     shares: shares,
-    //     lowerBound: lower
-    // };
-
-    // Calculate and return the number of shares
-    return Math.floor((funds / quoteCents) / 2);
+/**
+ * Returns the balance we can trade with in one day.
+ */
+module.exports.calculateTradingCapital = function(accountValue) {
+    return Math.floor(accountValue / 3);
 };

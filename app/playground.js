@@ -5,7 +5,7 @@ var Promise = require('bluebird');
 var Logging = require('./logging');
 var Config = require('../config/tradier');
 var Indicators = require('./indicators');
-var Math = require('./math');
+var MathHelper = require('./katherine');
 var Tradier = require('./APIs/tradier');
 
 // Example quote data
@@ -26,14 +26,6 @@ var quotes = {
 module.exports.playground = co(function*() {
     Logging.log('Playground');
     var tradier = new Tradier(Config.account, Config.token);
-
-    function returnTrue() {
-      return 3.45;
-    }
-
-    if (returnTrue() === true) {
-      Logging.log("Returned true");
-    }
 
     Logging.log('Playground complete');
     process.exit(0);

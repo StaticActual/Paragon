@@ -3,14 +3,14 @@
  * Created on 10/23/16.
  */
 var Config = require('../config/tradier.js');
-var Math = require('./math');
+var MathHelper = require('./katherine');
 
 /**
  * Logs the settings used when the program starts.
  */
 module.exports.logApplicationStartup = function logApplicationStartup() {
     console.log('******** Paragon is running ********');
-    console.log('   time: ' + Math.getTimestamp());
+    console.log('   time: ' + MathHelper.getTimestamp());
     console.log('   env: ' + process.env.NODE_ENV);
     console.log('   account: ' + Config.account);
     console.log('   database: ' + process.env.NODE_DB);
@@ -18,16 +18,16 @@ module.exports.logApplicationStartup = function logApplicationStartup() {
 };
 
 module.exports.log = function log(message) {
-    console.log('[' + Math.getTimestamp() + '] ' + message);
+    console.log('[' + MathHelper.getTimestamp() + '] ' + message);
 };
 
 module.exports.logObject = function log(object) {
-    console.log('[' + Math.getTimestamp() + '] [object]');
+    console.log('[' + MathHelper.getTimestamp() + '] [object]');
     console.log(JSON.stringify(object, null, 4));
 };
 
 module.exports.logBuyOrder = function log(symbol, shares, price) {
-    console.log('[' + Math.getTimestamp() + '] [buy]: ' + shares + ' shares of ' + symbol + ' at ' + price);
+    console.log('[' + MathHelper.getTimestamp() + '] [buy]: ' + shares + ' shares of ' + symbol + ' at ' + price);
 };
 
 module.exports.logSellOrder = function log(stock, shares, buyPrice, sellPrice) {
@@ -42,17 +42,17 @@ module.exports.logSellOrder = function log(stock, shares, buyPrice, sellPrice) {
         gainLossSymbol = '=';
     }
 
-    var timestamp = '[' + Math.getTimestamp() + '] ';
+    var timestamp = '[' + MathHelper.getTimestamp() + '] ';
     console.log(timestamp + gainLossSymbol + '[sell]: ' + shares + ' shares of ' + symbol);
     console.log('   buy price: ' + buyPrice);
     console.log('   sell price: ' + sellPrice);
 };
 
 module.exports.logMarketEvent = function log(message) {
-    console.log('[' + Math.getTimestamp() + '] [market]: ' + message);
+    console.log('[' + MathHelper.getTimestamp() + '] [market]: ' + message);
 };
 
 module.exports.logError = function logError(message) {
     // TODO: Write to separate error logging file
-    console.log('[' + Math.getTimestamp() + '] [ERROR] ' + message);
+    console.log('[' + MathHelper.getTimestamp() + '] [ERROR] ' + message);
 };

@@ -2,17 +2,18 @@
  * Created by Chandler Freeman on 2/26/16.
  * Adapted from Quiver 1.0 and Quiver-v2.
  *
- * This file is very heavy on the asynchronous code, and uses Promises
- * frequently for ease of use and organization.
+ * This file is very heavy on the asynchronous code, and uses coroutines frequently for 
+ * ease of use and organization.
  */
 var Promise = require('bluebird');
 var Schedule = require('node-schedule');
 var Logging = require('./logging');
-var Math = require('./math');
+var MathHelper = require('./katherine');
 var Playground = require('./playground');
 
 // API
 var Tradier = require('./APIs/tradier');
+var tradier;
 
 // Algorithms
 var BuyAlgorithm = require('./algorithms/buy');
@@ -24,6 +25,7 @@ var Stock = require('./models/stock');
 
 // Database objects
 var Mongoose = require("mongoose");
+Mongoose.Promise = Promise;
 var Config = require('../config/tradier');
 
 // The time interval at which trade() is run. One minute = 60000
@@ -55,14 +57,22 @@ var tradingHours;
 // Timeout for openingBell() functions
 var openingBellTimeout;
 
-// The required number of quotes before trading begins.
-const REQUIRED_QUOTES = 80;
+// The available cash for the day each day, and the cash remaining for the current day. capital
+// doesn't change, but capitalAvailable = capital at the end of each day.
+var totalAccountValue;
+var tradingCapital;
+var netGain = 0;
 
-// Algorithm constants
-const RSICutoff = 70;
+// The percent loss value of the total portfolio which triggers a TRADECON 3 shutdown
+const MAX_LOSS = 0.05;
+
+/**
+ * The array of symbols currently being traded.
+ */
+var activeSymbols = [];
 
 /*
- * @var quoteData will contain a JSON object that looks like this:
+ * This variable will contain a JSON object that looks like this:
  * {
  *    'symbol': [quote1, quote2, quote3, ...],
  *    'symbol2': [quote1, quote2, ...],
@@ -72,7 +82,7 @@ const RSICutoff = 70;
 var quoteData = {};
 
 /*
- * @var tradeData will contain a JSON object that looks like this:
+ * This variable will contain a JSON Object that looks like this:
  * {
  *    'symbol': {
  *      purchasePrice: 0.00,
@@ -82,22 +92,23 @@ var quoteData = {};
  *    ...
  * }
  *
- * Stocks will only exist in this Object if they have been purchased.
+ * Stocks will only exist in this Object if they are currently owned.
  */
-var tradeData = {};
+var positions = {};
 
 /**
- * The array of symbols currently being traded.
+ * An Object that contains information about pending buy orders. This variable will contain 
+ * a JSON Object that looks like this:
+ * {
+ *    'symbol': {
+ *      purchasePrice: 0.00,
+ *      shares: 0,
+ *      divorceLower: 0.00
+ *    },
+ *    ...
+ * }
  */
-var activeSymbols = [];
-
-// The available cash for the day each day, and the cash remaining for the current day. capital
-// doesn't change, but capitalAvailable = capital at the end of each day.
-var capital;
-var capitalAvailable;
-
-// The instance of Tradier that will be used to make trades.
-var tradier;
+var pendingBuyOrders = {};
 
 /**
  * Function that the Broker child process enters into; basically runs tests or init() depending 
@@ -130,9 +141,9 @@ var init = co(function*() {
 
     // Make sure the market is open today
     if (tradingHours.status === "open") {
-        var currentTime = Math.getNumericalTime();
-        var marketOpenTime = Math.convertToNumericalTime(tradingHours.open.start);
-        var marketCloseTime = Math.convertToNumericalTime(tradingHours.open.end);
+        var currentTime = MathHelper.getNumericalTime();
+        var marketOpenTime = MathHelper.convertToNumericalTime(tradingHours.open.start);
+        var marketCloseTime = MathHelper.convertToNumericalTime(tradingHours.open.end);
 
         // If the time is between 3am and market open
         if (WAKEUP_TIME <= currentTime && currentTime < marketOpenTime) {
@@ -157,7 +168,7 @@ var midnightRun = co(function*(symbol) {
     tradingHours = yield getTradingHours();
 
     if (tradingHours.status === "open") {
-        var msTillOpen = Math.convertToNumericalTime(tradingHours.open.start) - Math.getNumericalTime();
+        var msTillOpen = MathHelper.convertToNumericalTime(tradingHours.open.start) - MathHelper.getNumericalTime();
 
         // Run openingBell at tradingHours.open.start, or market open
         openingBellTimeout = setTimeout(openingBell, msTillOpen);
@@ -169,9 +180,12 @@ var midnightRun = co(function*(symbol) {
  * procedures, including getting symbol lists, managing data storage, and setting function intervals.
  */
 var openingBell = co(function*() {
-    Logging.log('=== Begin trading for ' + Math.getDate() + ' ===');
-    activeSymbols = yield getWatchlistSymbols();
+    Logging.log('=== Begin trading for ' + MathHelper.getDate() + ' ===');
+    var account = yield tradier.getAccountBalances();
+    var totalAccountValue = account.balances.total_equity;
+    var tradingCapital = AllocationAlgorithm.calculateTradingCapital(totalAccountValue);
 
+    activeSymbols = yield getWatchlistSymbols();
     for (var index in activeSymbols) {
         var symbol = activeSymbols[index];
         yield initializeDataStorageForSymbol(symbol);
@@ -186,7 +200,7 @@ var openingBell = co(function*() {
  * clearing variables and intervals.
  */
 var closingBell = co(function*() {
-    Logging.log('=== End trading for ' + Math.getDate() + ' ===');
+    Logging.log('=== End trading for ' + MathHelper.getDate() + ' ===');
 });
 
 /**
@@ -194,7 +208,7 @@ var closingBell = co(function*() {
  */
 var getTradingHours = co(function*() {
     var calendar = yield tradier.getMarketCalendar();
-    var dateToday = Math.getDate();
+    var dateToday = MathHelper.getDate();
     for (var index in calendar.calendar.days.day) {
         var day = calendar.calendar.days.day[index];
         if (day.date === dateToday) {
@@ -262,6 +276,13 @@ var trade = co(function*() {
         activeSymbols = updatedSymbols;
     }
 
+    // Loss-prevention feature
+    if (netGain < -(totalAccountValue * MAX_LOSS)) {
+        firesale();
+        cleanup();
+        return;
+    }
+
     var quotes = yield tradier.getQuotes(activeSymbols);
     for (var index in activeSymbols) {
         var symbol = activeSymbols[index];
@@ -287,33 +308,49 @@ var trade = co(function*() {
             continue;
         }
             
-        // If we don't already own the stock, look for buy indicators
-        if (TRADECON === 5 && !tradeData.hasOwnProperty(stock)) {
-            if (BuyAlgorithm.determineBuy(indicators) === true) {
-                var shares = AllocationAlgorithm.getShares(capitalAvailable, quote);
-                if (shares > 0) {
-                    tradier.placeLimitOrder(symbol, "buy", shares, quote);
+        // If we have a pending buy order for the stock
+        if (pendingBuyOrders.hasOwnProperty(symbol)) {
+            var orderStatus = yield tradier.getOrderStatus(pendingBuyOrders[symbol].id);
+            if (orderStatus.order.status === "filled") {
+                // Using the bitwise operator on a value like this will truncate to a whole number
+                var quantity = orderStatus.order.quantity | 0;
+                var price = orderStatus.order.price.toFixed(2);
+                var divorceLowerStart = price - stockObject.data.divorceBuffer;
+                positions[symbol] = {
+                    purchasePrice: price,
+                    shares: quantity,
+                    lowerBound: divorceLowerStart,
+                    divorceBuffer: stockObject.data.divorceBuffer
+                };
 
-                    var divorceLowerStart = quote - stockObject.data.divorceBuffer;
-                    tradeData[symbol] = {
-                        purchasePrice: quote,
-                        shares: shares,
-                        lowerBound: divorceLowerStart,
-                        divorceBuffer: stockObject.data.divorceBuffer
+                delete pendingBuyOrders[symbol];
+            }   
+        }
+
+        // If we don't already own the stock and there are no pending buy orders, check for buy indicators
+        if (TRADECON === 5 && !pendingBuyOrders.hasOwnProperty(symbol) && !positions.hasOwnProperty(symbol)) {
+            if (BuyAlgorithm.determineBuy(indicators) === true) {
+                var shares = AllocationAlgorithm.getShares(totalAccountValue, tradingCapital, quote);
+                if (shares > 0) {
+                    var order = tradier.placeLimitOrder(symbol, "buy", shares, quote);
+                    tradingCapital -= Math.ceil(quote * shares);
+                    pendingBuyOrders[symbol] = {
+                        id: order.order.id
                     };
                 }
             }
         }
         // If we already own the stock, let the sell algorithm work
-        else if ((TRADECON === 5 || TRADECON === 4) && tradeData.hasOwnProperty(symbol)) {
-            var sellSignal = SellAlgorithm.determineSell(quote, tradeData[symbol]);
+        else if ((TRADECON === 5 || TRADECON === 4) && positions.hasOwnProperty(symbol)) {
+            var sellSignal = SellAlgorithm.determineSell(quote, positions[symbol]);
             if (sellSignal === true) {
-                tradier.placeMarketOrder(symbol, "sell", shares);
-                delete tradeData[symbol];
+                tradier.placeMarketOrder(symbol, "sell", positions[symbol].shares);
+                netGain += ((quote - positions[symbol].purchasePrice) * positions[symbol].shares);
+                delete positions[symbol];
             }
             else {
                 var lower = sellSignal;
-                tradeData[symbol].lowerBound = lower;
+                positions[symbol].lowerBound = lower;
                 divorceLowerValue = lower;
             }
         }
@@ -326,8 +363,8 @@ var trade = co(function*() {
         yield stockObject.save();
     }
 
-    var currentTime = Math.getNumericalTime();
-    var marketCloseTime = Math.convertToNumericalTime(tradingHours.open.end);
+    var currentTime = MathHelper.getNumericalTime();
+    var marketCloseTime = MathHelper.convertToNumericalTime(tradingHours.open.end);
     if (currentTime >= marketCloseTime) {
         cleanup();
         return;
@@ -336,8 +373,7 @@ var trade = co(function*() {
         firesale();
     }
     else if (currentTime >= (marketCloseTime - 1800000)) {
-        // TODO: INCLUDE PENDING BUY ORDERS
-        if (TRADECON !== 4 && Object.keys(tradeData).length > 0) {
+        if (TRADECON !== 4 && Object.keys(positions).length > 0 && Object.keys(pendingBuyOrders).length > 0) {
             TRADECON = 4;
         }
         else {
@@ -347,12 +383,17 @@ var trade = co(function*() {
 });
 
 /**
- * Initiates a TRADECON 3 status. Places sell orders on all existing positions and 
+ * Initiates a TRADECON 3 status. Places sell orders on all existing positions and cancels
+ * pending buy orders.
  */
 function firesale() {
     TRADECON = 3;
-    // sell all held positions
-    // cancel pending buy orders
+    for (symbol in positions) {
+        tradier.placeMarketOrder(symbol, "sell", positions[symbol].shares);
+    }
+    for (symbol in pendingBuyOrders) {
+        tradier.cancelOrder(pendingBuyOrders[symbol].id);
+    }
 }
 
 /**
@@ -362,7 +403,7 @@ function cleanup() {
     clearInterval(tradeInterval);
     TRADECON = 5;
     quoteData = {};
-    tradeData = {};
+    positions = {};
     activeSymbols = [];
 }
 
