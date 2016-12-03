@@ -21,7 +21,7 @@
     },
     "env_production" : {
       "NODE_ENV": "production",
-      "NODE_DB": "mongodb://162.243.2.110/paragon"
+      "NODE_DB": "mongodb://10.128.5.85/paragon"
     }
   }]
 }
