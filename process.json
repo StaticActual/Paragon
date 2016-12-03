@@ -2,7 +2,7 @@
   "apps" : [{
     "script"      : "paragon.js",
     "watch"       : false,
-    "autorestart" : false,
+    "autorestart" : true,
     "env_development": {
       "NODE_ENV": "development",
       "NODE_DB": "mongodb://paragon_dev:paragon_dev@ds113668.mlab.com:13668/paragon_dev"
@@ -21,7 +21,7 @@
     },
     "env_production" : {
       "NODE_ENV": "production",
-      "NODE_DB": "mongodb://10.128.15.159/paragon"
+      "NODE_DB": "mongodb://162.243.2.110/paragon"
     }
   }]
 }

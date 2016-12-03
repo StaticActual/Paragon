@@ -14,9 +14,7 @@
     "talib": "^1.0.2"
   },
   "devDependencies": {
-    "chai": "^3.5.0",
-    "mocha": "^3.2.0",
-    "nodeunit": "^0.9.1"
+    "chai": "^3.5.0"
   },
   "author": "Chandler Freeman <chandler.freeman@gmail.com>",
   "private": true,
