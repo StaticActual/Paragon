@@ -128,6 +128,18 @@ process.on('message', function(argv) {
 });
 
 /**
+ * This function is run before the process is terminated.
+ */
+process.on('SIGINT', function() {
+    Logging.log("Recieved signal SIGINT");
+    clearInterval(tradeInterval);
+    clearTimeout(openingBellTimeout);
+    Mongoose.disconnect(function(err) {
+        process.exit(err ? 1 : 0);
+    });
+});
+
+/**
  * Standard initialization procedures, like building the database connection and constructing the Tradier
  * object. It also gets the current time and sets broker state accordingly.
  * 

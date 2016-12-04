@@ -1,5 +1,6 @@
 {
   "apps" : [{
+    "name"      : "Paragon",
     "script"      : "paragon.js",
     "watch"       : false,
     "autorestart" : false,
@@ -15,13 +16,19 @@
       "NODE_ENV": "testing",
       "NODE_DB": "mongodb://paragon_dev:paragon_dev@ds113668.mlab.com:13668/paragon_dev"
     },
-    "env_codeship" : {
-      "NODE_ENV": "testing",
-      "NODE_DB": "mongodb://localhost"
-    },
     "env_production" : {
       "NODE_ENV": "production",
       "NODE_DB": "mongodb://10.128.5.85/paragon"
     }
-  }]
+  }],
+  "deploy" : {
+    "production" : {
+      "user" : "root",
+      "host" : "192.241.252.179",
+      "repo" : "git@github.com:Stat1c14/Paragon.git",
+      "ref"  : "origin/master",
+      "path" : "/root/paragon",
+      "post-deploy" : "pm2 startOrRestart ecosystem.json --env production"
+    }
+  }
 }
