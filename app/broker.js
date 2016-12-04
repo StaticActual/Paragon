@@ -147,12 +147,19 @@ var init = co(function*() {
 
         // If the time is between 3am and market open
         if (WAKEUP_TIME <= currentTime && currentTime < marketOpenTime) {
-            midnightRun();
+            Logging.log('Market is not open yet; Getting market hours');
+            setOpeningBell();
         }
         // If the time is between market open and one hour before market close
         else if (marketOpenTime <= currentTime && currentTime <= (marketCloseTime - 3600000)) {
             openingBell();
         }
+        else {
+            Logging.log('Market is not open now; Awaiting market open');
+        }
+    }
+    else {
+        Logging.log('Market is closed today; Awaiting market open');
     }
 
     // Set the midnight run interval
@@ -161,19 +168,27 @@ var init = co(function*() {
 
 /**
  * Run on schedule early every day before trading beings. It pulls down the market hours for the
- * day and sets the interval for the start of day(coffee) function.
+ * day and sets the interval for the start of day(openingBell) function.
  */
 var midnightRun = co(function*(symbol) {
     Logging.log('On another midnight run...');
     tradingHours = yield getTradingHours();
 
     if (tradingHours.status === "open") {
-        var msTillOpen = MathHelper.convertToNumericalTime(tradingHours.open.start) - MathHelper.getNumericalTime();
-
-        // Run openingBell at tradingHours.open.start, or market open
-        openingBellTimeout = setTimeout(openingBell, msTillOpen);
+        setOpeningBell();
     }
 });
+
+/**
+ * Syncronously sets the opening bell interval based on tradingHours.
+ */
+function setOpeningBell() {
+    var msTillOpen = MathHelper.convertToNumericalTime(tradingHours.open.start) - MathHelper.getNumericalTime();
+
+    // Run openingBell at tradingHours.open.start, or market open
+    openingBellTimeout = setTimeout(openingBell, msTillOpen);
+    Logging.log('Ready for market open at ' + tradingHours.open.start);
+}
 
 /**
  * This is the function for SoD(start of day). It runs at market open. It performs standard initialization 
@@ -278,6 +293,7 @@ var trade = co(function*() {
 
     // Loss-prevention feature
     if (netGain < -(totalAccountValue * MAX_LOSS)) {
+        Logging.log("Daily losses have exceeded MAX_LOSS value of " + (MAX_LOSS*100) + "%; initiating TRADECON 3 status and halting for day");
         firesale();
         cleanup();
         return;
@@ -322,12 +338,12 @@ var trade = co(function*() {
                     lowerBound: divorceLowerStart,
                     divorceBuffer: stockObject.data.divorceBuffer
                 };
-
                 delete pendingBuyOrders[symbol];
+                Logging.logBuyOrderFullfilled(symbol, quantity, price);
             }   
         }
 
-        // If we don't already own the stock and there are no pending buy orders, check for buy indicators
+        // If we don't already own the stock and there are no pending buy orders for it, check for buy indicators
         if (TRADECON === 5 && !pendingBuyOrders.hasOwnProperty(symbol) && !positions.hasOwnProperty(symbol)) {
             if (BuyAlgorithm.determineBuy(indicators) === true) {
                 var shares = AllocationAlgorithm.getShares(totalAccountValue, tradingCapital, quote);
@@ -337,6 +353,7 @@ var trade = co(function*() {
                     pendingBuyOrders[symbol] = {
                         id: order.order.id
                     };
+                    Logging.logBuyOrder(symbol, shares, quote);
                 }
             }
         }
@@ -347,6 +364,7 @@ var trade = co(function*() {
                 tradier.placeMarketOrder(symbol, "sell", positions[symbol].shares);
                 netGain += ((quote - positions[symbol].purchasePrice) * positions[symbol].shares);
                 delete positions[symbol];
+                Logging.logSellOrder(symbol, positions[symbol].shares, positions[symbol].purchasePrice, quote);
             }
             else {
                 var lower = sellSignal;
@@ -365,19 +383,24 @@ var trade = co(function*() {
 
     var currentTime = MathHelper.getNumericalTime();
     var marketCloseTime = MathHelper.convertToNumericalTime(tradingHours.open.end);
+    // If the market is closed on this tick
     if (currentTime >= marketCloseTime) {
-        cleanup();
+        var account = yield tradier.getAccountBalances();
+        cleanup(account.balances.total_equity);
         return;
     }
-    else if (TRADECON !== 6 && currentTime >= (marketCloseTime - 600000)) {
+    // If < 10 minutes until market close
+    else if (TRADECON !== 6 && TRADECON !== 3 && currentTime >= (marketCloseTime - 600000)) {
         firesale();
     }
+    // If < 30 minutes until market close
     else if (currentTime >= (marketCloseTime - 1800000)) {
-        if (TRADECON !== 4 && Object.keys(positions).length > 0 && Object.keys(pendingBuyOrders).length > 0) {
-            TRADECON = 4;
+        // If we don't have any positions or any pending buy orders
+        if (Object.keys(positions).length === 0 && Object.keys(pendingBuyOrders).length === 0) {
+            TRADECON = 6;
         }
         else {
-            TRADECON = 6;
+            TRADECON = 4;
         }
     }   
 });
@@ -387,6 +410,7 @@ var trade = co(function*() {
  * pending buy orders.
  */
 function firesale() {
+    Logging.log("Initiating TRADECON 3 operation");
     TRADECON = 3;
     for (symbol in positions) {
         tradier.placeMarketOrder(symbol, "sell", positions[symbol].shares);
@@ -394,14 +418,23 @@ function firesale() {
     for (symbol in pendingBuyOrders) {
         tradier.cancelOrder(pendingBuyOrders[symbol].id);
     }
+    Logging.log("Firesale complete");
 }
 
 /**
  * A syncronous function that cleans up all of our variables after the trading day.
  */
-function cleanup() {
+function cleanup(finalAccountValue) {
+    Logging.log("End of trading:");
+    Logging.log("   TRADECON: " + TRADECON);
+    Logging.log("   Net Change($): " + netGain);
+    Logging.log("   Total Account Value($): " + finalAccountValue);
     clearInterval(tradeInterval);
+    clearTimeout(openingBellTimeout);
     TRADECON = 5;
+    netGain = 0;
+    totalAccountValue = 0;
+    tradingCapital = 0;
     quoteData = {};
     positions = {};
     activeSymbols = [];

@@ -27,7 +27,11 @@ module.exports.logObject = function log(object) {
 };
 
 module.exports.logBuyOrder = function log(symbol, shares, price) {
-    console.log('[' + MathHelper.getTimestamp() + '] [buy]: ' + shares + ' shares of ' + symbol + ' at ' + price);
+    console.log('[' + MathHelper.getTimestamp() + '] [pending buy]: ' + shares + ' shares of ' + symbol + ' at ' + price);
+};
+
+module.exports.logBuyOrderFullfilled = function log(symbol, shares, price) {
+    console.log('[' + MathHelper.getTimestamp() + '] [bought]: ' + shares + ' shares of ' + symbol + ' at ' + price);
 };
 
 module.exports.logSellOrder = function log(stock, shares, buyPrice, sellPrice) {

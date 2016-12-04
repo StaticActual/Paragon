@@ -1,8 +1,8 @@
 {
   "apps" : [{
     "script"      : "paragon.js",
-    "watch"       : true,
-    "autorestart" : true,
+    "watch"       : false,
+    "autorestart" : false,
     "env_development": {
       "NODE_ENV": "development",
       "NODE_DB": "mongodb://paragon_dev:paragon_dev@ds113668.mlab.com:13668/paragon_dev"
