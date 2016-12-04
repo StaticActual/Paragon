@@ -118,7 +118,7 @@ process.on('message', function(argv) {
     Logging.log(argv);
     switch(process.env.NODE_ENV) {
         case 'playground':
-            co(function*(){
+            co(function*() {
                 yield Playground.playground();
             })();
             break;
@@ -132,6 +132,7 @@ process.on('message', function(argv) {
  */
 process.on('SIGINT', function() {
     Logging.log("Recieved signal SIGINT");
+    clearInterval(midnightRunInterval);
     clearInterval(tradeInterval);
     clearTimeout(openingBellTimeout);
     Mongoose.disconnect(function(err) {
@@ -288,6 +289,7 @@ var initializeDataStorageForSymbol = co(function*(symbol) {
  * Where the magic happens.
  */
 var trade = co(function*() {
+    console.time("trade");
     var updatedSymbols = yield getWatchlistSymbols();
 
     // Bbb... Bbbbbb... Butttt Chandler, this isn't the right way to compare strings in JS! We don't need to
@@ -321,7 +323,7 @@ var trade = co(function*() {
         quoteData[symbol].push(quote);
         stockObject.data[stockObject.data.length - 1].quotes.push(quote);
 
-        var indicators = BuyAlgorithm.calculateIndicators(quoteData[symbol]);
+        var indicators = yield BuyAlgorithm.calculateIndicators(quoteData[symbol]);
         var divorceLowerValue = null;
 
         // If we don't have enough data to calculate indicators yet, we can just store the null
@@ -357,7 +359,7 @@ var trade = co(function*() {
 
         // If we don't already own the stock and there are no pending buy orders for it, check for buy indicators
         if (TRADECON === 5 && !pendingBuyOrders.hasOwnProperty(symbol) && !positions.hasOwnProperty(symbol)) {
-            if (BuyAlgorithm.determineBuy(indicators) === true) {
+            if (BuyAlgorithm.determineBuy(quote, indicators) === true) {
                 var shares = AllocationAlgorithm.getShares(totalAccountValue, tradingCapital, quote);
                 if (shares > 0) {
                     var order = tradier.placeLimitOrder(symbol, "buy", shares, quote);
@@ -414,7 +416,8 @@ var trade = co(function*() {
         else {
             TRADECON = 4;
         }
-    }   
+    }
+    console.timeEnd("trade");
 });
 
 /**
