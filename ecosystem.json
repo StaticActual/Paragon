@@ -28,7 +28,7 @@
       "repo" : "git@github.com:Stat1c14/Paragon.git",
       "ref"  : "origin/master",
       "path" : "/root/paragon",
-      "post-deploy" : "pm2 startOrRestart ecosystem.json --env production"
+      "post-deploy" : "npm install && pm2 startOrRestart ecosystem.json --env production"
     }
   }
 }
