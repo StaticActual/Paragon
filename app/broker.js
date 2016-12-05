@@ -210,8 +210,8 @@ function setOpeningBell() {
 var openingBell = co(function*() {
     Logging.log('=== Begin trading for ' + MathHelper.getDate() + ' ===');
     var account = yield tradier.getAccountBalances();
-    var totalAccountValue = account.balances.total_equity;
-    var tradingCapital = AllocationAlgorithm.calculateTradingCapital(totalAccountValue);
+    totalAccountValue = account.balances.total_equity;
+    tradingCapital = AllocationAlgorithm.calculateTradingCapital(totalAccountValue);
 
     activeSymbols = yield getWatchlistSymbols();
     for (var index in activeSymbols) {
