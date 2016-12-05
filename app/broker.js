@@ -277,6 +277,7 @@ var initializeDataStorageForSymbol = co(function*(symbol) {
         MACD: [],
         BBAND: [],
         RSI: [],
+        divorceLowerBound: [],
         divorceBuffer: buffer
     });
     yield stockObject.save();
