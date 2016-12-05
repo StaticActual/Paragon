@@ -219,6 +219,12 @@ var openingBell = co(function*() {
         yield initializeDataStorageForSymbol(symbol);
     }
 
+    Logging.log("   TRADECON: " + TRADECON);
+    Logging.log("   Hours: " + tradingHours.open.start + " -> " + tradingHours.open.end);
+    Logging.log("   Trading Capital($): " + finalAccountValue);
+    Logging.log("   Total Account Value($): " + finalAccountValue);
+    Logging.log("   Symbols: " + activeSymbols);
+
     tradeInterval = setInterval(trade, TICK_INTERVAL);
     trade();
 });
@@ -393,8 +399,10 @@ var trade = co(function*() {
         if (TRADECON === 5 && !pendingBuyOrders.hasOwnProperty(symbol) && !positions.hasOwnProperty(symbol)) {
             var buySignal = BuyAlgorithm.determineBuy(quote, indicators);
             if (buySignal) {
+                Logging.log("Got buy signal for " + symbol);
+                Logging.log("[" + totalAccountValue + ", " + tradingCapital + ", " + quote + "]");
                 var shares = AllocationAlgorithm.getShares(totalAccountValue, tradingCapital, quote);
-                Logging.log("Got buy signal for " + symbol + "; purchasing " + shares + " shares");
+                Logging.log("Calculated " + shares + " shares");
                 if (shares > 0) {
                     var order = tradier.placeLimitOrder(symbol, "buy", shares, quote);
                     tradingCapital -= Math.ceil(quote * shares);

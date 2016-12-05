@@ -35,10 +35,11 @@ module.exports.playground = co(function*() {
     Logging.log('Playground');
     var tradier = new Tradier(Config.account, Config.token);
 
-    console.time("indicators");
-    var indicators = yield BuyAlgorithm.calculateIndicators(quotes["ONE"]);
-    console.timeEnd("indicators");
-    Logging.logObject(indicators);
+    var totalAccountValue = 1000.00;
+    var tradingCapital = 333.33;
+    var quote = 10.40;
+    var shares = AllocationAlgorithm.getShares(totalAccountValue, tradingCapital, quote);
+    Logging.log(shares);
 
     Logging.log('Playground complete');
     process.exit(0);
