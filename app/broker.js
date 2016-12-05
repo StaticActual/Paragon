@@ -227,9 +227,22 @@ var openingBell = co(function*() {
  * This is the function for EoD(end of day). It runs at market close. It acts as a cleanup function by
  * clearing variables and intervals.
  */
-var closingBell = co(function*() {
+var closingBell = function(finalAccountValue) {
+    Logging.log("End of trading day:");
+    Logging.log("   TRADECON: " + TRADECON);
+    Logging.log("   Net Change($): " + netGain);
+    Logging.log("   Total Account Value($): " + finalAccountValue);
+    clearInterval(tradeInterval);
+    clearTimeout(openingBellTimeout);
+    TRADECON = 5;
+    netGain = 0;
+    totalAccountValue = 0;
+    tradingCapital = 0;
+    quoteData = {};
+    positions = {};
+    activeSymbols = [];
     Logging.log('=== End trading for ' + MathHelper.getDate() + ' ===');
-});
+};
 
 /**
  * Returns an object containing the trading hours for the current day.
@@ -287,10 +300,26 @@ var initializeDataStorageForSymbol = co(function*(symbol) {
 });
 
 /**
+ * Initiates a TRADECON 3 status. Places sell orders on all existing positions and cancels
+ * pending buy orders.
+ */
+function firesale() {
+    Logging.log("Initiating TRADECON 3 operation");
+    TRADECON = 3;
+    for (symbol in positions) {
+        tradier.placeMarketOrder(symbol, "sell", positions[symbol].shares);
+    }
+    for (symbol in pendingBuyOrders) {
+        tradier.cancelOrder(pendingBuyOrders[symbol].id);
+    }
+    Logging.log("Firesale complete");
+}
+
+/**
  * Where the magic happens.
  */
 var trade = co(function*() {
-    console.time("trade");
+    Logging.log("TICK @ TRADECON " + TRADECON);
     var updatedSymbols = yield getWatchlistSymbols();
 
     // Bbb... Bbbbbb... Butttt Chandler, this isn't the right way to compare strings in JS! We don't need to
@@ -310,7 +339,9 @@ var trade = co(function*() {
     if (netGain < -(totalAccountValue * MAX_LOSS)) {
         Logging.log("Daily losses have exceeded MAX_LOSS value of " + (MAX_LOSS*100) + "%; initiating TRADECON 3 status and halting for day");
         firesale();
-        cleanup();
+
+        var account = yield tradier.getAccountBalances();
+        closingBell(account.balances.total_equity);
         return;
     }
 
@@ -338,7 +369,7 @@ var trade = co(function*() {
             yield stockObject.save();
             continue;
         }
-            
+
         // If we have a pending buy order for the stock
         if (pendingBuyOrders.hasOwnProperty(symbol)) {
             var orderStatus = yield tradier.getOrderStatus(pendingBuyOrders[symbol].id);
@@ -360,8 +391,10 @@ var trade = co(function*() {
 
         // If we don't already own the stock and there are no pending buy orders for it, check for buy indicators
         if (TRADECON === 5 && !pendingBuyOrders.hasOwnProperty(symbol) && !positions.hasOwnProperty(symbol)) {
-            if (BuyAlgorithm.determineBuy(quote, indicators) === true) {
+            var buySignal = BuyAlgorithm.determineBuy(quote, indicators);
+            if (buySignal) {
                 var shares = AllocationAlgorithm.getShares(totalAccountValue, tradingCapital, quote);
+                Logging.log("Got buy signal for " + symbol + "; purchasing " + shares + " shares");
                 if (shares > 0) {
                     var order = tradier.placeLimitOrder(symbol, "buy", shares, quote);
                     tradingCapital -= Math.ceil(quote * shares);
@@ -400,12 +433,14 @@ var trade = co(function*() {
     var marketCloseTime = MathHelper.convertToNumericalTime(tradingHours.open.end);
     // If the market is closed on this tick
     if (currentTime >= marketCloseTime) {
+        Logging.log("End of the day at " + marketCloseTime + "; current time is " + currentTime + "; tradingHours.open.end is " + tradingHours.open.end);
         var account = yield tradier.getAccountBalances();
-        cleanup(account.balances.total_equity);
+        closingBell(account.balances.total_equity);
         return;
     }
     // If < 10 minutes until market close
     else if (TRADECON !== 6 && TRADECON !== 3 && currentTime >= (marketCloseTime - 600000)) {
+        Logging.log("Firesale at " + (marketCloseTime - 600000) + "; current time is " + currentTime + "; tradingHours.open.end is " + tradingHours.open.end);
         firesale();
     }
     // If < 30 minutes until market close
@@ -413,48 +448,13 @@ var trade = co(function*() {
         // If we don't have any positions or any pending buy orders
         if (Object.keys(positions).length === 0 && Object.keys(pendingBuyOrders).length === 0) {
             TRADECON = 6;
+            Logging.log("TRADECON 6 at " + (marketCloseTime - 1800000) + "; current time is " + currentTime + "; tradingHours.open.end is " + tradingHours.open.end);
         }
         else {
             TRADECON = 4;
         }
     }
-    console.timeEnd("trade");
 });
-
-/**
- * Initiates a TRADECON 3 status. Places sell orders on all existing positions and cancels
- * pending buy orders.
- */
-function firesale() {
-    Logging.log("Initiating TRADECON 3 operation");
-    TRADECON = 3;
-    for (symbol in positions) {
-        tradier.placeMarketOrder(symbol, "sell", positions[symbol].shares);
-    }
-    for (symbol in pendingBuyOrders) {
-        tradier.cancelOrder(pendingBuyOrders[symbol].id);
-    }
-    Logging.log("Firesale complete");
-}
-
-/**
- * A syncronous function that cleans up all of our variables after the trading day.
- */
-function cleanup(finalAccountValue) {
-    Logging.log("End of trading:");
-    Logging.log("   TRADECON: " + TRADECON);
-    Logging.log("   Net Change($): " + netGain);
-    Logging.log("   Total Account Value($): " + finalAccountValue);
-    clearInterval(tradeInterval);
-    clearTimeout(openingBellTimeout);
-    TRADECON = 5;
-    netGain = 0;
-    totalAccountValue = 0;
-    tradingCapital = 0;
-    quoteData = {};
-    positions = {};
-    activeSymbols = [];
-}
 
 /**
  * Coroutine wrapper
