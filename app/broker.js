@@ -221,8 +221,8 @@ var openingBell = co(function*() {
 
     Logging.log("   TRADECON: " + TRADECON);
     Logging.log("   Hours: " + tradingHours.open.start + " -> " + tradingHours.open.end);
-    Logging.log("   Trading Capital($): " + finalAccountValue);
-    Logging.log("   Total Account Value($): " + finalAccountValue);
+    Logging.log("   Trading Capital($): " + tradingCapital);
+    Logging.log("   Total Account Value($): " + totalAccountValue);
     Logging.log("   Symbols: " + activeSymbols);
 
     tradeInterval = setInterval(trade, TICK_INTERVAL);
