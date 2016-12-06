@@ -43,7 +43,7 @@ module.exports = Tradier;
 /**
  * Gets account balances.
  */
-Tradier.prototype.getAccountBalances = function() {
+Tradier.prototype.getAccountBalancesAsync = function() {
     var options = this.options;
     options.url = partial_endpoints.accounts + this.account + '/balances';
     options.method = 'GET';
@@ -54,7 +54,7 @@ Tradier.prototype.getAccountBalances = function() {
 /**
  * Gets all active account positions.
  */
-Tradier.prototype.getAccountPositions = function() {
+Tradier.prototype.getAccountPositionsAsync = function() {
     var options = this.options;
     options.url = partial_endpoints.accounts + this.account + '/positions';
     options.method = 'GET';
@@ -65,7 +65,7 @@ Tradier.prototype.getAccountPositions = function() {
 /**
  * Get status of specific order by id.
  */
-Tradier.prototype.getOrderStatus = function(id) {
+Tradier.prototype.getOrderStatusAsync = function(id) {
     var options = this.options;
     options.url = partial_endpoints.accounts + this.account + '/orders/' + id;
     options.method = 'GET';
@@ -76,7 +76,7 @@ Tradier.prototype.getOrderStatus = function(id) {
 /**
  * Cancel an order by id.
  */
-Tradier.prototype.cancelOrder = function(id) {
+Tradier.prototype.cancelOrderAsync = function(id) {
     var options = this.options;
     options.url = partial_endpoints.accounts + this.account + '/orders/' + id;
     options.method = 'DELETE';
@@ -87,7 +87,7 @@ Tradier.prototype.cancelOrder = function(id) {
 /**
  * Gets all pending orders on an account.
  */
-Tradier.prototype.getAccountOrders = function() {
+Tradier.prototype.getAccountOrdersAsync = function() {
     var options = this.options;
     options.url = partial_endpoints.accounts + this.account + '/orders';
     options.method = 'GET';
@@ -100,7 +100,7 @@ Tradier.prototype.getAccountOrders = function() {
  *
  * @param {string[]} symbolArray - An array of symbols(strings).
  */
-Tradier.prototype.getQuotes = function(symbolArray) {
+Tradier.prototype.getQuotesAsync = function(symbolArray) {
     var options = this.options;
     var symbolString = "?symbols=";
     for (index in symbolArray) {
@@ -123,7 +123,7 @@ Tradier.prototype.getQuotes = function(symbolArray) {
     preview to true, and the API will still return the same information, but without actually placing the order 
     on the market. This is included for testing purposes.
  */
-Tradier.prototype.placeMarketOrder = function(symbol, side, quantity, preview = false) {
+Tradier.prototype.placeMarketOrderAsync = function(symbol, side, quantity, preview = false) {
     var options = this.options;
     options.form = {
         class: "equity",
@@ -152,7 +152,7 @@ Tradier.prototype.placeMarketOrder = function(symbol, side, quantity, preview = 
     preview to true, and the API will still return the same information, but without actually placing the order 
     on the market. This is included for testing purposes.
  */
-Tradier.prototype.placeLimitOrder = function(symbol, side, quantity, price, preview = false) {
+Tradier.prototype.placeLimitOrderAsync = function(symbol, side, quantity, price, preview = false) {
     var options = this.options;
     options.form = {
         class: "equity",
@@ -173,9 +173,9 @@ Tradier.prototype.placeLimitOrder = function(symbol, side, quantity, price, prev
 /**
  * Simple GET endpoints
  */
-Tradier.prototype.getIntradayStatus = simpleGet(partial_endpoints.intraday_status);
-Tradier.prototype.getMarketCalendar = simpleGet(partial_endpoints.market_calendar);
-Tradier.prototype.getDefaultWatchlist = simpleGet(partial_endpoints.get_default_watchlist);
+Tradier.prototype.getIntradayStatusAsync = simpleGet(partial_endpoints.intraday_status);
+Tradier.prototype.getMarketCalendarAsync = simpleGet(partial_endpoints.market_calendar);
+Tradier.prototype.getDefaultWatchlistAsync = simpleGet(partial_endpoints.get_default_watchlist);
 
 /**
  * Wrapper for a simple GET request

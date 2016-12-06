@@ -28,7 +28,7 @@ module.exports.determineBuy = function(quote, indicators) {
 /**
  * Returns a JSON object containing the indicator data
  */
-module.exports.calculateIndicators = co(function*(quotes) {
+module.exports.calculateIndicatorsAsync = co(function*(quotes) {
     if (quotes.length > minQuotes) {
         var MACD = yield Indicators.MACD(quotes);
         var BBAND = yield Indicators.BBANDS(quotes);

@@ -35,11 +35,13 @@ module.exports.playground = co(function*() {
     Logging.log('Playground');
     var tradier = new Tradier(Config.account, Config.token);
 
-    var totalAccountValue = 1000.00;
-    var tradingCapital = 333.33;
-    var quote = 10.40;
-    var shares = AllocationAlgorithm.getShares(totalAccountValue, tradingCapital, quote);
-    Logging.log(shares);
+    var capital = 100000;
+    var days = 20;
+    var dailyReturn = 0.003;
+    for (var i = 0; i < days; i++) {
+        capital += (capital * dailyReturn);
+    }
+    Logging.log(capital.toFixed(2));
 
     Logging.log('Playground complete');
     process.exit(0);

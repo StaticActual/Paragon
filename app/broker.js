@@ -150,7 +150,7 @@ var init = co(function*() {
     Mongoose.connect(process.env.NODE_DB);
     Logging.log('DATABASE [OK]');
     tradier = new Tradier(Config.account, Config.token);
-    tradingHours = yield getTradingHours();
+    tradingHours = yield getTradingHoursAsync();
 
     // Make sure the market is open today
     if (tradingHours.status === "open") {
@@ -165,7 +165,7 @@ var init = co(function*() {
         }
         // If the time is between market open and one hour before market close
         else if (marketOpenTime <= currentTime && currentTime <= (marketCloseTime - 3600000)) {
-            openingBell();
+            openingBellAsync();
         }
         else {
             Logging.log('Market is not open now; Awaiting market open');
@@ -176,16 +176,16 @@ var init = co(function*() {
     }
 
     // Set the midnight run interval
-    midnightRunInterval = Schedule.scheduleJob('0 0 * * *', midnightRun);
+    midnightRunInterval = Schedule.scheduleJob('0 3 * * *', midnightRunAsync);
 });
 
 /**
  * Run on schedule early every day before trading beings. It pulls down the market hours for the
  * day and sets the interval for the start of day(openingBell) function.
  */
-var midnightRun = co(function*(symbol) {
+var midnightRunAsync = co(function*(symbol) {
     Logging.log('On another midnight run...');
-    tradingHours = yield getTradingHours();
+    tradingHours = yield getTradingHoursAsync();
 
     if (tradingHours.status === "open") {
         setOpeningBell();
@@ -207,16 +207,16 @@ function setOpeningBell() {
  * This is the function for SoD(start of day). It runs at market open. It performs standard initialization 
  * procedures, including getting symbol lists, managing data storage, and setting function intervals.
  */
-var openingBell = co(function*() {
+var openingBellAsync = co(function*() {
     Logging.log('=== Begin trading for ' + MathHelper.getDate() + ' ===');
-    var account = yield tradier.getAccountBalances();
+    var account = yield tradier.getAccountBalancesAsync();
     totalAccountValue = account.balances.total_equity;
     tradingCapital = AllocationAlgorithm.calculateTradingCapital(totalAccountValue);
 
-    activeSymbols = yield getWatchlistSymbols();
+    activeSymbols = yield getWatchlistSymbolsAsync();
     for (var index in activeSymbols) {
         var symbol = activeSymbols[index];
-        yield initializeDataStorageForSymbol(symbol);
+        yield initializeDataStorageForSymbolAsync(symbol);
     }
 
     Logging.log("   TRADECON: " + TRADECON);
@@ -226,7 +226,7 @@ var openingBell = co(function*() {
     Logging.log("   Symbols: " + activeSymbols);
 
     tradeInterval = setInterval(trade, TICK_INTERVAL);
-    trade();
+    tradeAsync();
 });
 
 /**
@@ -253,8 +253,8 @@ var closingBell = function(finalAccountValue) {
 /**
  * Returns an object containing the trading hours for the current day.
  */
-var getTradingHours = co(function*() {
-    var calendar = yield tradier.getMarketCalendar();
+var getTradingHoursAsync = co(function*() {
+    var calendar = yield tradier.getMarketCalendarAsync();
     var dateToday = MathHelper.getDate();
     for (var index in calendar.calendar.days.day) {
         var day = calendar.calendar.days.day[index];
@@ -267,8 +267,8 @@ var getTradingHours = co(function*() {
 /**
  * Returns an array of stocks to watch from the Tradier default watchlist.
  */
-var getWatchlistSymbols = co(function*() {
-    var watchlist = yield tradier.getDefaultWatchlist();
+var getWatchlistSymbolsAsync = co(function*() {
+    var watchlist = yield tradier.getDefaultWatchlistAsync();
     var updatedActiveSymbols = [];
     for (index in watchlist.watchlist.items.item) {
         updatedActiveSymbols[index] = watchlist.watchlist.items.item[index].symbol;
@@ -279,7 +279,7 @@ var getWatchlistSymbols = co(function*() {
 /**
  * Creates a subdocument in the database for the trading day for a certain symbol.
  */
-var initializeDataStorageForSymbol = co(function*(symbol) {
+var initializeDataStorageForSymbolAsync = co(function*(symbol) {
     // Search for object with the symbol in the database, and create a new one if it doesn't find one
     var stockObject = yield Stock.findOne({ 'symbol': symbol });
     if (!stockObject) {
@@ -287,8 +287,8 @@ var initializeDataStorageForSymbol = co(function*(symbol) {
     }
 
     // Calculate the Divorce algorithm lower buffer value so we can store it for today
-    var quote = yield tradier.getQuotes([symbol]);
-    var buffer = yield SellAlgorithm.determineDivorceLower(quote.quotes.quote.low, quote.quotes.quote.high);
+    var quote = yield tradier.getQuotesAsync([symbol]);
+    var buffer = yield SellAlgorithm.determineDivorceLowerAsync(quote.quotes.quote.low, quote.quotes.quote.high);
 
     // Create a subdocument for today's trading
     stockObject.data.push({
@@ -313,10 +313,10 @@ function firesale() {
     Logging.log("Initiating TRADECON 3 operation");
     TRADECON = 3;
     for (symbol in positions) {
-        tradier.placeMarketOrder(symbol, "sell", positions[symbol].shares);
+        tradier.placeMarketOrderAsync(symbol, "sell", positions[symbol].shares);
     }
     for (symbol in pendingBuyOrders) {
-        tradier.cancelOrder(pendingBuyOrders[symbol].id);
+        tradier.cancelOrderAsync(pendingBuyOrders[symbol].id);
     }
     Logging.log("Firesale complete");
 }
@@ -324,8 +324,8 @@ function firesale() {
 /**
  * Where the magic happens.
  */
-var trade = co(function*() {
-    var updatedSymbols = yield getWatchlistSymbols();
+var tradeAsync = co(function*() {
+    var updatedSymbols = yield getWatchlistSymbolsAsync();
 
     // Bbb... Bbbbbb... Butttt Chandler, this isn't the right way to compare strings in JS! We don't need to
     // compare them strictly, because any change in the array should trigger the refresh, so it works.
@@ -333,7 +333,7 @@ var trade = co(function*() {
         for (index in updatedSymbols) {
             // If the symbol isn't in the current list
             if (activeSymbols.indexOf(updatedSymbols[index]) === -1) {
-                initializeDataStorageForSymbol(updatedSymbols[index]);
+                yield initializeDataStorageForSymbolAsync(updatedSymbols[index]);
                 Logging.log("Now actively trading " + updatedSymbols[index]);
             }
         }
@@ -343,14 +343,13 @@ var trade = co(function*() {
     // Loss-prevention feature
     if (netGain < -(totalAccountValue * MAX_LOSS)) {
         Logging.log("Daily losses have exceeded MAX_LOSS value of " + (MAX_LOSS*100) + "%; initiating TRADECON 3 status and halting for day");
+        var account = yield tradier.getAccountBalancesAsync();
         firesale();
-
-        var account = yield tradier.getAccountBalances();
         closingBell(account.balances.total_equity);
         return;
     }
 
-    var quotes = yield tradier.getQuotes(activeSymbols);
+    var quotes = yield tradier.getQuotesAsync(activeSymbols);
     for (var index in activeSymbols) {
         var symbol = activeSymbols[index];
         var quote = quotes.quotes.quote[index].last.toFixed(2);
@@ -360,7 +359,7 @@ var trade = co(function*() {
         quoteData[symbol].push(quote);
         stockObject.data[stockObject.data.length - 1].quotes.push(quote);
 
-        var indicators = yield BuyAlgorithm.calculateIndicators(quoteData[symbol]);
+        var indicators = yield BuyAlgorithm.calculateIndicatorsAsync(quoteData[symbol]);
         var divorceLowerValue = null;
 
         // If we don't have enough data to calculate indicators yet, we can just store the null
@@ -377,7 +376,7 @@ var trade = co(function*() {
 
         // If we have a pending buy order for the stock
         if (pendingBuyOrders.hasOwnProperty(symbol)) {
-            var orderStatus = yield tradier.getOrderStatus(pendingBuyOrders[symbol].id);
+            var orderStatus = yield tradier.getOrderStatusAsync(pendingBuyOrders[symbol].id);
             if (orderStatus.order.status === "filled") {
                 // Using the bitwise operator on a value like this will truncate to a whole number
                 var quantity = orderStatus.order.quantity | 0;
@@ -400,7 +399,7 @@ var trade = co(function*() {
             if (buySignal) {
                 var shares = AllocationAlgorithm.getShares(totalAccountValue, tradingCapital, quote);
                 if (shares > 0) {
-                    var order = tradier.placeLimitOrder(symbol, "buy", shares, quote);
+                    var order = yield tradier.placeLimitOrderAsync(symbol, "buy", shares, quote);
                     tradingCapital -= Math.ceil(quote * shares);
                     pendingBuyOrders[symbol] = {
                         id: order.order.id
@@ -413,7 +412,7 @@ var trade = co(function*() {
         else if ((TRADECON === 5 || TRADECON === 4) && positions.hasOwnProperty(symbol)) {
             var sellSignal = SellAlgorithm.determineSell(quote, positions[symbol]);
             if (sellSignal === true) {
-                tradier.placeMarketOrder(symbol, "sell", positions[symbol].shares);
+                yield tradier.placeMarketOrderAsync(symbol, "sell", positions[symbol].shares);
                 netGain += ((quote - positions[symbol].purchasePrice) * positions[symbol].shares);
                 delete positions[symbol];
                 Logging.logSellOrder(symbol, positions[symbol].shares, positions[symbol].purchasePrice, quote);
@@ -437,7 +436,7 @@ var trade = co(function*() {
     var marketCloseTime = MathHelper.convertToNumericalTime(tradingHours.open.end);
     // If the market is closed on this tick
     if (currentTime >= marketCloseTime) {
-        var account = yield tradier.getAccountBalances();
+        var account = yield tradier.getAccountBalancesAsync();
         closingBell(account.balances.total_equity);
         return;
     }

@@ -39,7 +39,7 @@ module.exports.determineSell = function(quote, stockData) {
  * return 0.02 if the start point for the Divorce algorithm is supposed to be 2 cents 
  * lower than the share price.
  */
-module.exports.determineDivorceLower = co(function*(low, high) {
+module.exports.determineDivorceLowerAsync = co(function*(low, high) {
     var ADR = yield Indicators.ADR(low, high);
     var lower = ADRMultiplier * ADR + Offset;
     return lower.toFixed(2);
