@@ -29,7 +29,7 @@ Mongoose.Promise = Promise;
 var Config = require('../config/tradier');
 
 // The time interval at which trade() is run. One minute = 60000
-const TICK_INTERVAL = 30000;
+const TICK_INTERVAL = 15000;
 
 // The interval for trade() is run based on TICK_INTERVAL
 var tradeInterval = null;
