@@ -1,6 +1,6 @@
 {
   "apps" : [{
-    "name"      : "Paragon",
+    "name"      : "paragon",
     "script"      : "paragon.js",
     "watch"       : false,
     "autorestart" : false,

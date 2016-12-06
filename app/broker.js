@@ -325,7 +325,6 @@ function firesale() {
  * Where the magic happens.
  */
 var trade = co(function*() {
-    Logging.log("TICK @ TRADECON " + TRADECON);
     var updatedSymbols = yield getWatchlistSymbols();
 
     // Bbb... Bbbbbb... Butttt Chandler, this isn't the right way to compare strings in JS! We don't need to
@@ -399,10 +398,7 @@ var trade = co(function*() {
         if (TRADECON === 5 && !pendingBuyOrders.hasOwnProperty(symbol) && !positions.hasOwnProperty(symbol)) {
             var buySignal = BuyAlgorithm.determineBuy(quote, indicators);
             if (buySignal) {
-                Logging.log("Got buy signal for " + symbol);
-                Logging.log("[" + totalAccountValue + ", " + tradingCapital + ", " + quote + "]");
                 var shares = AllocationAlgorithm.getShares(totalAccountValue, tradingCapital, quote);
-                Logging.log("Calculated " + shares + " shares");
                 if (shares > 0) {
                     var order = tradier.placeLimitOrder(symbol, "buy", shares, quote);
                     tradingCapital -= Math.ceil(quote * shares);
@@ -441,14 +437,12 @@ var trade = co(function*() {
     var marketCloseTime = MathHelper.convertToNumericalTime(tradingHours.open.end);
     // If the market is closed on this tick
     if (currentTime >= marketCloseTime) {
-        Logging.log("End of the day at " + marketCloseTime + "; current time is " + currentTime + "; tradingHours.open.end is " + tradingHours.open.end);
         var account = yield tradier.getAccountBalances();
         closingBell(account.balances.total_equity);
         return;
     }
     // If < 10 minutes until market close
     else if (TRADECON !== 6 && TRADECON !== 3 && currentTime >= (marketCloseTime - 600000)) {
-        Logging.log("Firesale at " + (marketCloseTime - 600000) + "; current time is " + currentTime + "; tradingHours.open.end is " + tradingHours.open.end);
         firesale();
     }
     // If < 30 minutes until market close
@@ -456,7 +450,6 @@ var trade = co(function*() {
         // If we don't have any positions or any pending buy orders
         if (Object.keys(positions).length === 0 && Object.keys(pendingBuyOrders).length === 0) {
             TRADECON = 6;
-            Logging.log("TRADECON 6 at " + (marketCloseTime - 1800000) + "; current time is " + currentTime + "; tradingHours.open.end is " + tradingHours.open.end);
         }
         else {
             TRADECON = 4;
