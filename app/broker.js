@@ -199,7 +199,7 @@ function setOpeningBell() {
     var msTillOpen = MathHelper.convertToNumericalTime(tradingHours.open.start) - MathHelper.getNumericalTime();
 
     // Run openingBell at tradingHours.open.start, or market open
-    openingBellTimeout = setTimeout(openingBell, msTillOpen);
+    openingBellTimeout = setTimeout(openingBellAsync, msTillOpen);
     Logging.log('Ready for market open at ' + tradingHours.open.start);
 }
 
@@ -225,7 +225,7 @@ var openingBellAsync = co(function*() {
     Logging.log("   Total Account Value($): " + totalAccountValue);
     Logging.log("   Symbols: " + activeSymbols);
 
-    tradeInterval = setInterval(trade, TICK_INTERVAL);
+    tradeInterval = setInterval(tradeAsync, TICK_INTERVAL);
     tradeAsync();
 });
 
