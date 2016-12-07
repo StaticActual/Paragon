@@ -8,10 +8,10 @@ var indicators = require('../app/indicators');
 
 exports['test'] = co(function*() {
     Logging.log("***** Testing Talib... *****");
-    test_BBANDS();
-    test_MACD();
-    test_RSI();
-    test_ADR();
+    yield test_BBANDS();
+    yield test_MACD();
+    yield test_RSI();
+    yield test_ADR();
 });
 
 var stockData = {

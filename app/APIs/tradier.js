@@ -14,6 +14,12 @@ var request = require('request');
 var Tradier = function(account, token) {
   this.account = account;
   this.token = token;
+
+  // FOR THE LOVE OF ALL THINGS GODLY
+  // Please remember that the 'let reqOptions = Object.assign({}, this.options);' line in each method
+  // only creates a shallow copy of the options object. So everything in the 'headers' key is passed
+  // by reference. This is ok since it's a safe bet that we won't modify the headers on a per-request
+  // basis. I hate this f***ing language sometimes.
   this.options = {
     headers: {
       'Accept' :                   'application/json',
@@ -44,55 +50,55 @@ module.exports = Tradier;
  * Gets account balances.
  */
 Tradier.prototype.getAccountBalancesAsync = function() {
-    var options = this.options;
-    options.url = partial_endpoints.accounts + this.account + '/balances';
-    options.method = 'GET';
+    let reqOptions = Object.assign({}, this.options);
+    reqOptions.url = partial_endpoints.accounts + this.account + '/balances';
+    reqOptions.method = 'GET';
     
-    return requestPromise(options);
+    return requestPromise(reqOptions);
 };
 
 /**
  * Gets all active account positions.
  */
 Tradier.prototype.getAccountPositionsAsync = function() {
-    var options = this.options;
-    options.url = partial_endpoints.accounts + this.account + '/positions';
-    options.method = 'GET';
-
-    return requestPromise(options);
+    let reqOptions = Object.assign({}, this.options);
+    reqOptions.url = partial_endpoints.accounts + this.account + '/positions';
+    reqOptions.method = 'GET';
+    
+    return requestPromise(reqOptions);
 };
 
 /**
  * Get status of specific order by id.
  */
 Tradier.prototype.getOrderStatusAsync = function(id) {
-    var options = this.options;
-    options.url = partial_endpoints.accounts + this.account + '/orders/' + id;
-    options.method = 'GET';
+    let reqOptions = Object.assign({}, this.options);
+    reqOptions.url = partial_endpoints.accounts + this.account + '/orders/' + id;
+    reqOptions.method = 'GET';
     
-    return requestPromise(options);
+    return requestPromise(reqOptions);
 };
 
 /**
  * Cancel an order by id.
  */
 Tradier.prototype.cancelOrderAsync = function(id) {
-    var options = this.options;
-    options.url = partial_endpoints.accounts + this.account + '/orders/' + id;
-    options.method = 'DELETE';
+    let reqOptions = Object.assign({}, this.options);
+    reqOptions.url = partial_endpoints.accounts + this.account + '/orders/' + id;
+    reqOptions.method = 'DELETE';
     
-    return requestPromise(options);
+    return requestPromise(reqOptions);
 };
 
 /**
  * Gets all pending orders on an account.
  */
 Tradier.prototype.getAccountOrdersAsync = function() {
-    var options = this.options;
-    options.url = partial_endpoints.accounts + this.account + '/orders';
-    options.method = 'GET';
+    let reqOptions = Object.assign({}, this.options);
+    reqOptions.url = partial_endpoints.accounts + this.account + '/orders';
+    reqOptions.method = 'GET';
     
-    return requestPromise(options);
+    return requestPromise(reqOptions);
 };
 
 /**
@@ -101,15 +107,15 @@ Tradier.prototype.getAccountOrdersAsync = function() {
  * @param {string[]} symbolArray - An array of symbols(strings).
  */
 Tradier.prototype.getQuotesAsync = function(symbolArray) {
-    var options = this.options;
+    let reqOptions = Object.assign({}, this.options);
     var symbolString = "?symbols=";
     for (index in symbolArray) {
         symbolString += "," + symbolArray[index];
     }
-    options.url = partial_endpoints.quotes + symbolString;
-    options.method = 'GET';
+    reqOptions.url = partial_endpoints.quotes + symbolString;
+    reqOptions.method = 'GET';
     
-    return requestPromise(options);
+    return requestPromise(reqOptions);
 };
 
 /**
@@ -124,8 +130,8 @@ Tradier.prototype.getQuotesAsync = function(symbolArray) {
     on the market. This is included for testing purposes.
  */
 Tradier.prototype.placeMarketOrderAsync = function(symbol, side, quantity, preview = false) {
-    var options = this.options;
-    options.form = {
+    let reqOptions = Object.assign({}, this.options);
+    reqOptions.form = {
         class: "equity",
         symbol: symbol,
         duration: "day",
@@ -134,10 +140,10 @@ Tradier.prototype.placeMarketOrderAsync = function(symbol, side, quantity, previ
         type: "market",
         preview: preview
     }
-    options.uri = partial_endpoints.accounts + this.account + '/orders';
-    options.method = 'POST';
+    reqOptions.uri = partial_endpoints.accounts + this.account + '/orders';
+    reqOptions.method = 'POST';
     
-    return requestPromise(options);
+    return requestPromise(reqOptions);
 };
 
 /**
@@ -153,8 +159,8 @@ Tradier.prototype.placeMarketOrderAsync = function(symbol, side, quantity, previ
     on the market. This is included for testing purposes.
  */
 Tradier.prototype.placeLimitOrderAsync = function(symbol, side, quantity, price, preview = false) {
-    var options = this.options;
-    options.form = {
+    let reqOptions = Object.assign({}, this.options);
+    reqOptions.form = {
         class: "equity",
         symbol: symbol,
         duration: "day",
@@ -164,38 +170,51 @@ Tradier.prototype.placeLimitOrderAsync = function(symbol, side, quantity, price,
         price: price,
         preview: preview
     }
-    options.uri = partial_endpoints.accounts + this.account + '/orders';
-    options.method = 'POST';
+    reqOptions.uri = partial_endpoints.accounts + this.account + '/orders';
+    reqOptions.method = 'POST';
     
-    return requestPromise(options);
+    return requestPromise(reqOptions);
 };
 
 /**
- * Simple GET endpoints
+ * Gets the default Tradier watchlist.
  */
-Tradier.prototype.getIntradayStatusAsync = simpleGet(partial_endpoints.intraday_status);
-Tradier.prototype.getMarketCalendarAsync = simpleGet(partial_endpoints.market_calendar);
-Tradier.prototype.getDefaultWatchlistAsync = simpleGet(partial_endpoints.get_default_watchlist);
+Tradier.prototype.getDefaultWatchlistAsync = function() {
+    let reqOptions = Object.assign({}, this.options);
+    reqOptions.url = partial_endpoints.get_default_watchlist;
+    reqOptions.method = 'GET';
+    
+    return requestPromise(reqOptions);
+};
 
 /**
- * Wrapper for a simple GET request
+ * Gets the intraday market status.
  */
-function simpleGet(url) {
-    return function() {
-        var options = this.options;
-        options.url = url;
-        options.method = 'GET';
+Tradier.prototype.getMarketCalendarAsync = function() {
+    let reqOptions = Object.assign({}, this.options);
+    reqOptions.url = partial_endpoints.market_calendar;
+    reqOptions.method = 'GET';
+    
+    return requestPromise(reqOptions);
+};
 
-        return requestPromise(options);
-    }
-}
+/**
+ * Gets the current market calendar for month.
+ */
+Tradier.prototype.getIntradayStatusAsync = function() {
+    let reqOptions = Object.assign({}, this.options);
+    reqOptions.url = partial_endpoints.intraday_status;
+    reqOptions.method = 'GET';
+    
+    return requestPromise(reqOptions);
+};
 
 /**
  * Wrapper for a request callback as a promise
  */
-function requestPromise(options) {
+function requestPromise(reqOptions) {
     return new Promise(function(resolve, reject) {
-        request(options, function(err, httpResponse, body) {
+        request(reqOptions, function(err, httpResponse, body) {
             if (err) {
                 return reject(err);
             }

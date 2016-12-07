@@ -35,13 +35,39 @@ module.exports.playground = co(function*() {
     Logging.log('Playground');
     var tradier = new Tradier(Config.account, Config.token);
 
-    var capital = 100000;
-    var days = 20;
-    var dailyReturn = 0.003;
-    for (var i = 0; i < days; i++) {
-        capital += (capital * dailyReturn);
+    var MyAPIWrapper = function() {
+        this.options = {
+            someValue: "42"
+        };
+    };
+
+    MyAPIWrapper.prototype.mutateThis = function() {
+        var localOptions = this.options;
+        localOptions.someValue = "7";
+        console.log(localOptions.someValue);
+        console.log(this.options.someValue);
     }
-    Logging.log(capital.toFixed(2));
+
+    var APIWrapper = new MyAPIWrapper();
+    APIWrapper.mutateThis();
+
+    var arrayOne = {
+        prop: 4
+    };
+
+    var arrayTwo = arrayOne;
+    arrayTwo.prop = 5;
+
+    console.log(arrayOne.prop);
+    console.log(arrayTwo.prop);
+
+    // var capital = 100000;
+    // var days = 20;
+    // var dailyReturn = 0.003;
+    // for (var i = 0; i < days; i++) {
+    //     capital += (capital * dailyReturn);
+    // }
+    // Logging.log(capital.toFixed(2));
 
     Logging.log('Playground complete');
     process.exit(0);

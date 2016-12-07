@@ -9,17 +9,11 @@ exports['test'] = co(function*() {
     Logging.log("***** Testing Tradier API... *****");
     tradier = new Tradier(Config.account, Config.token);
 
-    // The tests are run asyncronously, so they may finish in different orders. This is done
-    // to save .00000003 nanoseconds of testing time.
-    test_quotesAsync();
-    test_market_timingAsync();
-    test_watchlistAsync();
-
-    // These tests *MUST* be run in order, because the test_orders functions actually places a
-    // fake order, but then the test_account will not return the correct positions list. So don't 
-    // mess with it.
-    yield test_accountAsync();
+    yield test_quotesAsync();
+    yield test_market_timingAsync();
+    yield test_watchlistAsync();
     yield test_ordersAsync();
+    yield test_accountAsync();
 });
 
 // Tests endpoints.quotes
