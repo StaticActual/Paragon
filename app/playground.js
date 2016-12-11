@@ -35,31 +35,85 @@ module.exports.playground = co(function*() {
     Logging.log('Playground');
     var tradier = new Tradier(Config.account, Config.token);
 
-    var MyAPIWrapper = function() {
-        this.options = {
-            someValue: "42"
-        };
-    };
+    var runThisCo = co(function*() {
+        console.log("coFunc");
+        for (var i = 0; i<10; ++i) {
+            console.log("coFunc " + i);
+        }
+        // yield runThisCo2();
+    });
 
-    MyAPIWrapper.prototype.mutateThis = function() {
-        var localOptions = this.options;
-        localOptions.someValue = "7";
-        console.log(localOptions.someValue);
-        console.log(this.options.someValue);
+    var runThisCo2 = co(function*() {
+        console.log("coFunc2");
+        for (var i = 0; i<10; ++i) {
+            console.log("coFunc2 " + i);
+        }
+    });
+
+    var runThisSync = function*() {
+        console.log("Hello world in 5");
     }
 
-    var APIWrapper = new MyAPIWrapper();
-    APIWrapper.mutateThis();
+    function* runThisDuo() {
+        console.log("Duo testing!");
+    }
 
-    var arrayOne = {
-        prop: 4
-    };
+    function named() {
+        console.log("Calling");
+        runThisSync();
+        runThisDuo();
+        //runThisCo(); // running this function asyncronously
+        co(runThisSync); // running this function asyncronously
+        console.log("Later h8ter");
+    }
 
-    var arrayTwo = arrayOne;
-    arrayTwo.prop = 5;
+    function* onlyOneYield() {
+        yield co(function*() {
+            console.log("coFunc");
+            setTimeout(function() {
+                console.log("A short time later");
+            }, 5000);
+        });
+    }
 
-    console.log(arrayOne.prop);
-    console.log(arrayTwo.prop);
+    function norm() {
+        console.log("Before");
+        co(function*() {
+                yield runThisCo();
+            })();
+        co(function*() {
+                yield runThisCo2();
+            })();
+        console.log("After");
+    }
+
+    norm();
+
+    // var MyAPIWrapper = function() {
+    //     this.options = {
+    //         someValue: "42"
+    //     };
+    // };
+
+    // MyAPIWrapper.prototype.mutateThis = function() {
+    //     var localOptions = this.options;
+    //     localOptions.someValue = "7";
+    //     console.log(localOptions.someValue);
+    //     console.log(this.options.someValue);
+    // }
+
+    // var APIWrapper = new MyAPIWrapper();
+    // APIWrapper.mutateThis();
+
+    // var arrayOne = {
+    //     prop: 4
+    // };
+
+    // var arrayTwo = arrayOne;
+    // arrayTwo.prop = 5;
+
+    // console.log(arrayOne.prop);
+    // console.log(arrayTwo.prop);
 
     // var capital = 100000;
     // var days = 20;

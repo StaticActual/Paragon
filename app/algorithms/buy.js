@@ -3,13 +3,12 @@
  */
 var Promise = require('bluebird');
 var Indicators = require('../indicators');
-var Logging = require('../logging');
 
 /**
  * Algorithm constants
  */
 const RSICutoff = 70;
-const minQuotes = 40;
+const minQuotes = 120;
 
 /**
  * Reads indicators and determines buy suitability. Returns true if strong buy signals, returns false if not.

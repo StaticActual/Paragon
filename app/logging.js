@@ -34,7 +34,7 @@ module.exports.logBuyOrderFullfilled = function log(symbol, shares, price) {
     console.log('[' + MathHelper.getTimestamp() + '] [bought]: ' + shares + ' shares of ' + symbol + ' at ' + price);
 };
 
-module.exports.logSellOrder = function log(stock, shares, buyPrice, sellPrice) {
+module.exports.logSellOrder = function log(symbol, shares, buyPrice, sellPrice) {
     var gainLossSymbol;
     if (buyPrice > sellPrice) {
         gainLossSymbol = '-';
@@ -48,8 +48,8 @@ module.exports.logSellOrder = function log(stock, shares, buyPrice, sellPrice) {
 
     var timestamp = '[' + MathHelper.getTimestamp() + '] ';
     console.log(timestamp + gainLossSymbol + '[sell]: ' + shares + ' shares of ' + symbol);
-    console.log('   buy price: ' + buyPrice);
-    console.log('   sell price: ' + sellPrice);
+    console.log(timestamp + '   buy price: ' + buyPrice);
+    console.log(timestamp + '   sell price: ' + sellPrice);
 };
 
 module.exports.logMarketEvent = function log(message) {

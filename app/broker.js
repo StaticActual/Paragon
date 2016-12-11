@@ -147,8 +147,7 @@ process.on('SIGINT', function() {
  * @param {{NODE_DB}} process.env
  */
 var init = co(function*() {
-    Mongoose.connect(process.env.NODE_DB);
-    Logging.log('DATABASE [OK]');
+    Logging.log('TRADIER API [OK]');
     tradier = new Tradier(Config.account, Config.token);
     tradingHours = yield getTradingHoursAsync();
 
@@ -210,14 +209,16 @@ function setOpeningBell() {
 var openingBellAsync = co(function*() {
     Logging.log('=== Begin trading for ' + MathHelper.getDate() + ' ===');
     var account = yield tradier.getAccountBalancesAsync();
-    totalAccountValue = account.balances.total_equity;
+    totalAccountValue = account.balances.total_equity.toFixed(2);
     tradingCapital = AllocationAlgorithm.calculateTradingCapital(totalAccountValue);
 
+    Mongoose.connect(process.env.NODE_DB);
     activeSymbols = yield getWatchlistSymbolsAsync();
     for (var index in activeSymbols) {
         var symbol = activeSymbols[index];
         yield initializeDataStorageForSymbolAsync(symbol);
     }
+    Logging.log("   DATABASE [OK]");
 
     Logging.log("   TRADECON: " + TRADECON);
     Logging.log("   Hours: " + tradingHours.open.start + " -> " + tradingHours.open.end);
@@ -235,6 +236,8 @@ var openingBellAsync = co(function*() {
  */
 var closingBell = function(finalAccountValue) {
     Logging.log("End of trading day:");
+    Mongoose.disconnect();
+    Logging.log("   DATABASE [OK]");
     Logging.log("   TRADECON: " + TRADECON);
     Logging.log("   Net Change($): " + netGain);
     Logging.log("   Total Account Value($): " + finalAccountValue);
@@ -381,15 +384,15 @@ var tradeAsync = co(function*() {
                 // Using the bitwise operator on a value like this will truncate to a whole number
                 var quantity = orderStatus.order.quantity | 0;
                 var price = orderStatus.order.price.toFixed(2);
-                var divorceLowerStart = price - stockObject.data.divorceBuffer;
+                var divorceLowerStart = price - stockObject.data[stockObject.data.length - 1].divorceBuffer;
                 positions[symbol] = {
                     purchasePrice: price,
                     shares: quantity,
                     lowerBound: divorceLowerStart,
-                    divorceBuffer: stockObject.data.divorceBuffer
+                    divorceBuffer: stockObject.data[stockObject.data.length - 1].divorceBuffer
                 };
-                delete pendingBuyOrders[symbol];
                 Logging.logBuyOrderFullfilled(symbol, quantity, price);
+                delete pendingBuyOrders[symbol];
             }   
         }
 
@@ -400,11 +403,13 @@ var tradeAsync = co(function*() {
                 var shares = AllocationAlgorithm.getShares(totalAccountValue, tradingCapital, quote);
                 if (shares > 0) {
                     var order = yield tradier.placeLimitOrderAsync(symbol, "buy", shares, quote);
-                    tradingCapital -= Math.ceil(quote * shares);
-                    pendingBuyOrders[symbol] = {
-                        id: order.order.id
-                    };
-                    Logging.logBuyOrder(symbol, shares, quote);
+                    if (order.order.status === "ok") {
+                        tradingCapital -= Math.ceil(quote * shares);
+                        pendingBuyOrders[symbol] = {
+                            id: order.order.id
+                        };
+                        Logging.logBuyOrder(symbol, shares, quote);
+                    }
                 }
             }
         }
@@ -414,8 +419,8 @@ var tradeAsync = co(function*() {
             if (sellSignal === true) {
                 yield tradier.placeMarketOrderAsync(symbol, "sell", positions[symbol].shares);
                 netGain += ((quote - positions[symbol].purchasePrice) * positions[symbol].shares);
-                delete positions[symbol];
                 Logging.logSellOrder(symbol, positions[symbol].shares, positions[symbol].purchasePrice, quote);
+                delete positions[symbol];
             }
             else {
                 var lower = sellSignal;
