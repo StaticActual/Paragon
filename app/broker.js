@@ -44,7 +44,6 @@ var TRADECON = 5;
  * This is also a constant that is represented in other ways throughout the program. So don't
  * change it.
  */
-
 var WAKEUP_TIME = 10800000; // She says it's cold outside and she hands me my raincoat...
 
 // Contains the interval for the midnightRun() function. It is run at WAKEUP_TIME every day.
@@ -213,13 +212,16 @@ var openingBellAsync = co(function*() {
     tradingCapital = AllocationAlgorithm.calculateTradingCapital(totalAccountValue);
 
     Mongoose.connect(process.env.NODE_DB);
+    Logging.log("   DATABASE [OK]");
     activeSymbols = yield getWatchlistSymbolsAsync();
+    Logging.log("   SYMBOLS [OK]");
+    var quotes = yield tradier.getQuotesAsync(activeSymbols);
     for (var index in activeSymbols) {
         var symbol = activeSymbols[index];
-        yield initializeDataStorageForSymbolAsync(symbol);
+        yield initializeDataStorageForSymbolAsync(symbol, quotes.quotes.quote[index]);
     }
-    Logging.log("   DATABASE [OK]");
-
+    Logging.log("   DATA MODELS [OK]");
+    Logging.log("   *********");
     Logging.log("   TRADECON: " + TRADECON);
     Logging.log("   Hours: " + tradingHours.open.start + " -> " + tradingHours.open.end);
     Logging.log("   Trading Capital($): " + tradingCapital);
@@ -238,6 +240,7 @@ var closingBell = function(finalAccountValue) {
     Logging.log("End of trading day:");
     Mongoose.disconnect();
     Logging.log("   DATABASE [OK]");
+    Logging.log("   *********");
     Logging.log("   TRADECON: " + TRADECON);
     Logging.log("   Net Change($): " + netGain);
     Logging.log("   Total Account Value($): " + finalAccountValue);
@@ -282,7 +285,7 @@ var getWatchlistSymbolsAsync = co(function*() {
 /**
  * Creates a subdocument in the database for the trading day for a certain symbol.
  */
-var initializeDataStorageForSymbolAsync = co(function*(symbol) {
+var initializeDataStorageForSymbolAsync = co(function*(symbol, quoteData) {
     // Search for object with the symbol in the database, and create a new one if it doesn't find one
     var stockObject = yield Stock.findOne({ 'symbol': symbol });
     if (!stockObject) {
@@ -290,8 +293,8 @@ var initializeDataStorageForSymbolAsync = co(function*(symbol) {
     }
 
     // Calculate the Divorce algorithm lower buffer value so we can store it for today
-    var quote = yield tradier.getQuotesAsync([symbol]);
-    var buffer = yield SellAlgorithm.determineDivorceLowerAsync(quote.quotes.quote.low, quote.quotes.quote.high);
+    // TODO: Move the quote fetch outside the loop, upgrade mongo
+    var buffer = yield SellAlgorithm.determineDivorceLowerAsync(quoteData.low, quoteData.high);
 
     // Create a subdocument for today's trading
     stockObject.data.push({
