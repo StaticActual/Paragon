@@ -25,7 +25,7 @@ var Stock = require('./models/stock');
 
 // Database objects
 var Mongoose = require("mongoose");
-Mongoose.Promise = Promise;
+// Mongoose.Promise = Promise;
 var Config = require('../config/tradier');
 
 // The time interval at which trade() is run. One minute = 60000
