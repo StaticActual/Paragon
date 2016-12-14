@@ -25,7 +25,7 @@ var Stock = require('./models/stock');
 
 // Database objects
 var Mongoose = require("mongoose");
-// Mongoose.Promise = Promise;
+Mongoose.Promise = Promise;
 var Config = require('../config/tradier');
 
 // The time interval at which trade() is run. One minute = 60000
@@ -289,11 +289,10 @@ var initializeDataStorageForSymbolAsync = co(function*(symbol, quoteData) {
     // Search for object with the symbol in the database, and create a new one if it doesn't find one
     var stockObject = yield Stock.findOne({ 'symbol': symbol });
     if (!stockObject) {
-        stockObject = new Stock({ 'symbol': symbol });
+        stockObject = new Stock({ 'symbol': symbol, 'data': [] });
     }
 
     // Calculate the Divorce algorithm lower buffer value so we can store it for today
-    // TODO: Move the quote fetch outside the loop, upgrade mongo
     var buffer = yield SellAlgorithm.determineDivorceLowerAsync(quoteData.low, quoteData.high);
 
     // Create a subdocument for today's trading
@@ -305,10 +304,19 @@ var initializeDataStorageForSymbolAsync = co(function*(symbol, quoteData) {
         divorceLowerBound: [],
         divorceBuffer: buffer
     });
-    yield stockObject.save();
+
+    // Replace with callback so we can check errors
+    // yield stockObject.save();
+    stockObject.save(function(err, product, numAffected) {
+        if (err) {
+            console.log(err);
+            console.log(product);
+        }
+        quoteData[symbol] = [];
+    });
 
     // Ensure the symbol is in our local object as well
-    quoteData[symbol] = [];
+    // quoteData[symbol] = [];
 });
 
 /**

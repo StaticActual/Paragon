@@ -35,59 +35,86 @@ module.exports.playground = co(function*() {
     Logging.log('Playground');
     var tradier = new Tradier(Config.account, Config.token);
 
-    var runThisCo = co(function*() {
-        console.log("coFunc");
-        for (var i = 0; i<10; ++i) {
-            console.log("coFunc " + i);
-        }
-        // yield runThisCo2();
+    var stockObject = yield Stock.findOne({ 'symbol': "SPWR" });
+    if (!stockObject) {
+        stockObject = new Stock({ 'symbol': symbol });
+        stockObject.data = [];
+    }
+
+    // Create a subdocument for today's trading
+    stockObject.data.push({
+        quotes: [],
+        MACD: [],
+        BBAND: [],
+        RSI: [],
+        divorceLowerBound: [],
+        divorceBuffer: 0.02
     });
 
-    var runThisCo2 = co(function*() {
-        console.log("coFunc2");
-        for (var i = 0; i<10; ++i) {
-            console.log("coFunc2 " + i);
+    // Replace with callback so we can check errors
+    // yield stockObject.save();
+    stockObject.save(function(err, product, numAffected) {
+        if (err) {
+            console.log(err);
         }
     });
 
-    var runThisSync = function*() {
-        console.log("Hello world in 5");
-    }
+    // Ensure the symbol is in our local object as well
+    quoteData[symbol] = [];
 
-    function* runThisDuo() {
-        console.log("Duo testing!");
-    }
+    // var runThisCo = co(function*() {
+    //     console.log("coFunc");
+    //     for (var i = 0; i<10; ++i) {
+    //         console.log("coFunc " + i);
+    //     }
+    //     // yield runThisCo2();
+    // });
 
-    function named() {
-        console.log("Calling");
-        runThisSync();
-        runThisDuo();
-        //runThisCo(); // running this function asyncronously
-        co(runThisSync); // running this function asyncronously
-        console.log("Later h8ter");
-    }
+    // var runThisCo2 = co(function*() {
+    //     console.log("coFunc2");
+    //     for (var i = 0; i<10; ++i) {
+    //         console.log("coFunc2 " + i);
+    //     }
+    // });
 
-    function* onlyOneYield() {
-        yield co(function*() {
-            console.log("coFunc");
-            setTimeout(function() {
-                console.log("A short time later");
-            }, 5000);
-        });
-    }
+    // var runThisSync = function*() {
+    //     console.log("Hello world in 5");
+    // }
 
-    function norm() {
-        console.log("Before");
-        co(function*() {
-                yield runThisCo();
-            })();
-        co(function*() {
-                yield runThisCo2();
-            })();
-        console.log("After");
-    }
+    // function* runThisDuo() {
+    //     console.log("Duo testing!");
+    // }
 
-    norm();
+    // function named() {
+    //     console.log("Calling");
+    //     runThisSync();
+    //     runThisDuo();
+    //     //runThisCo(); // running this function asyncronously
+    //     co(runThisSync); // running this function asyncronously
+    //     console.log("Later h8ter");
+    // }
+
+    // function* onlyOneYield() {
+    //     yield co(function*() {
+    //         console.log("coFunc");
+    //         setTimeout(function() {
+    //             console.log("A short time later");
+    //         }, 5000);
+    //     });
+    // }
+
+    // function norm() {
+    //     console.log("Before");
+    //     co(function*() {
+    //             yield runThisCo();
+    //         })();
+    //     co(function*() {
+    //             yield runThisCo2();
+    //         })();
+    //     console.log("After");
+    // }
+
+    // norm();
 
     // var MyAPIWrapper = function() {
     //     this.options = {
