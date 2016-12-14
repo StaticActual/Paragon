@@ -214,7 +214,7 @@ var openingBellAsync = co(function*() {
     Mongoose.connect(process.env.NODE_DB);
     Logging.log("   DATABASE [OK]");
     activeSymbols = yield getWatchlistSymbolsAsync();
-    Logging.log("   SYMBOLS [OK]");
+    Logging.log("   WATCHLIST [OK]");
     var quotes = yield tradier.getQuotesAsync(activeSymbols);
     for (var index in activeSymbols) {
         var symbol = activeSymbols[index];
@@ -285,7 +285,7 @@ var getWatchlistSymbolsAsync = co(function*() {
 /**
  * Creates a subdocument in the database for the trading day for a certain symbol.
  */
-var initializeDataStorageForSymbolAsync = co(function*(symbol, quoteData) {
+var initializeDataStorageForSymbolAsync = co(function*(symbol, quote) {
     // Search for object with the symbol in the database, and create a new one if it doesn't find one
     var stockObject = yield Stock.findOne({ 'symbol': symbol });
     if (!stockObject) {
@@ -293,7 +293,15 @@ var initializeDataStorageForSymbolAsync = co(function*(symbol, quoteData) {
     }
 
     // Calculate the Divorce algorithm lower buffer value so we can store it for today
-    var buffer = yield SellAlgorithm.determineDivorceLowerAsync(quoteData.low, quoteData.high);
+    var buffer = yield SellAlgorithm.determineDivorceLowerAsync(quote.low, quote.high);
+    if (Number.isNaN(buffer)) {
+        Logging.log("Invalid symbol " + symbol + "; Removing from trade list");
+        var index = activeSymbols.indexOf(symbol);
+        if (index > -1) {
+            activeSymbols.splice(index, 1);
+        }
+        return;
+    }
 
     // Create a subdocument for today's trading
     stockObject.data.push({
@@ -304,19 +312,10 @@ var initializeDataStorageForSymbolAsync = co(function*(symbol, quoteData) {
         divorceLowerBound: [],
         divorceBuffer: buffer
     });
-
-    // Replace with callback so we can check errors
-    // yield stockObject.save();
-    stockObject.save(function(err, product, numAffected) {
-        if (err) {
-            console.log(err);
-            console.log(product);
-        }
-        quoteData[symbol] = [];
-    });
+    yield stockObject.save();
 
     // Ensure the symbol is in our local object as well
-    // quoteData[symbol] = [];
+    quoteData[symbol] = [];
 });
 
 /**
