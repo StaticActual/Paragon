@@ -312,10 +312,19 @@ var initializeDataStorageForSymbolAsync = co(function*(symbol, quote) {
         divorceLowerBound: [],
         divorceBuffer: buffer
     });
-    yield stockObject.save();
+
+    // yield stockObject.save();
+
+    stockObject.save(function(err, product, numAffected) {
+        if (err) {
+            console.log(err);		
+-           console.log(product);
+        }
+        quoteData[symbol] = [];
+    });
 
     // Ensure the symbol is in our local object as well
-    quoteData[symbol] = [];
+    // quoteData[symbol] = [];
 });
 
 /**
