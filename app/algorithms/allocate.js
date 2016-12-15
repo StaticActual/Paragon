@@ -6,13 +6,16 @@ var MathHelper = require('../katherine');
 /**
  * Algorithm constants
  */
-const percentOfNetValuePerTrade = 0.03;
+const percentOfNetValuePerTrade = 0.05;
 
 /**
  * Returns the number of shares the user can purchase, given the current price.
  */
 module.exports.getShares = function(netCapital, tradingCapital, quote) {
     var funds = percentOfNetValuePerTrade * netCapital;
+    if (funds >= tradingCapital) {
+        return 0;
+    }
     return Math.floor(funds / quote);
 };
 

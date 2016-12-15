@@ -413,7 +413,7 @@ var tradeAsync = co(function*() {
                 var shares = AllocationAlgorithm.getShares(totalAccountValue, tradingCapital, quote);
                 if (shares > 0) {
                     var order = yield tradier.placeLimitOrderAsync(symbol, "buy", shares, quote);
-                    if (order.order.status === "ok") {
+                    if (order.hasOwnProperty('order') && order.order.status === "ok") {
                         tradingCapital -= Math.ceil(quote * shares);
                         pendingBuyOrders[symbol] = {
                             id: order.order.id
