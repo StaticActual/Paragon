@@ -105,11 +105,8 @@ module.exports.RSI = function(quotes) {
  * @param {max}			Float				Daily high.
  */
 module.exports.ADR = function(min, max) {
-  var promise = new Promise(function(resolve, reject) {
     var minCents = MathHelper.convertToIntegerCents(min);
     var maxCents = MathHelper.convertToIntegerCents(max);
     var ADR = Math.ceil((maxCents - minCents) / 2);
-    resolve(MathHelper.convertToFloatDollars(ADR));
-  });
-  return promise;
+    return MathHelper.convertToFloatDollars(ADR);
 };

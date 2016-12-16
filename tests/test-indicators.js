@@ -50,7 +50,7 @@ var test_RSI = co(function*() {
 
 var test_ADR = co(function*() {
   var assert = Chai.assert;
-  var adr = yield indicators.ADR(3.08, 3.25);
+  var adr = indicators.ADR(3.08, 3.25);
   assert.equal(adr, 0.09);
   Logging.log("test_ADR [OK]");
 });

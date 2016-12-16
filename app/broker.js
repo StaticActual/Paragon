@@ -209,13 +209,15 @@ var openingBellAsync = co(function*() {
     Logging.log('=== Begin trading for ' + MathHelper.getDate() + ' ===');
     var account = yield tradier.getAccountBalancesAsync();
     totalAccountValue = account.balances.total_equity.toFixed(2);
-    tradingCapital = AllocationAlgorithm.calculateTradingCapital(totalAccountValue);
+    var cashAvailible = account.balances.cash.cash_available.toFixed(2);
+    tradingCapital = AllocationAlgorithm.calculateTradingCapital(totalAccountValue, cashAvailible);
 
     Mongoose.connect(process.env.NODE_DB);
     Logging.log("   DATABASE [OK]");
     activeSymbols = yield getWatchlistSymbolsAsync();
     Logging.log("   WATCHLIST [OK]");
     var quotes = yield tradier.getQuotesAsync(activeSymbols);
+    Logging.log("   INIT DATA MODELS [OK]");
     for (var index in activeSymbols) {
         var symbol = activeSymbols[index];
         yield initializeDataStorageForSymbolAsync(symbol, quotes.quotes.quote[index]);
@@ -226,7 +228,7 @@ var openingBellAsync = co(function*() {
     Logging.log("   Hours: " + tradingHours.open.start + " -> " + tradingHours.open.end);
     Logging.log("   Trading Capital($): " + tradingCapital);
     Logging.log("   Total Account Value($): " + totalAccountValue);
-    Logging.log("   Symbols: " + activeSymbols);
+    Logging.log("   Symbols(" + activeSymbols.length + "): " + activeSymbols);
 
     tradeInterval = setInterval(tradeAsync, TICK_INTERVAL);
     tradeAsync();
@@ -242,7 +244,7 @@ var closingBell = function(finalAccountValue) {
     Logging.log("   DATABASE [OK]");
     Logging.log("   *********");
     Logging.log("   TRADECON: " + TRADECON);
-    Logging.log("   Net Change($): " + netGain);
+    Logging.log("   Net Change($): " + netGain.toFixed(2));
     Logging.log("   Total Account Value($): " + finalAccountValue);
     clearInterval(tradeInterval);
     clearTimeout(openingBellTimeout);
@@ -293,9 +295,18 @@ var initializeDataStorageForSymbolAsync = co(function*(symbol, quote) {
     }
 
     // Calculate the Divorce algorithm lower buffer value so we can store it for today
-    var buffer = yield SellAlgorithm.determineDivorceLowerAsync(quote.low, quote.high);
-    if (Number.isNaN(buffer)) {
-        Logging.log("Invalid symbol " + symbol + "; Removing from trade list");
+    if (!quote.hasOwnProperty("low") || !quote.hasOwnProperty("high")) {
+        Logging.log("       - Invalid quote data provided for [" + symbol + "]; Removing");
+        var index = activeSymbols.indexOf(symbol);
+        if (index > -1) {
+            activeSymbols.splice(index, 1);
+        }
+        return;
+    }
+
+    var buffer = SellAlgorithm.determineDivorceLower(quote.low, quote.high);
+    if (Number.isNaN(buffer) || buffer == "NaN" || buffer <= 0) {
+        Logging.log("       - Invalid buffer value for [" + symbol + "]; Removing");
         var index = activeSymbols.indexOf(symbol);
         if (index > -1) {
             activeSymbols.splice(index, 1);
@@ -313,20 +324,21 @@ var initializeDataStorageForSymbolAsync = co(function*(symbol, quote) {
         divorceBuffer: buffer
     });
 
-    // yield stockObject.save();
-
-    stockObject.save(function(err, product, numAffected) {
-        if (err) {
-            Logging.log("Error for " + symbol + " with buffer " + buffer);
-            Logging.logObject(quote);
-            Logging.log(err);		
--           Logging.log(product);
+    // Ensure the object is valid before saving it
+    try {
+        yield stockObject.validate();
+    } catch (e) {
+        Logging.log("       - Mongoose object failed to validate! [" + symbol + ", " + divorceBuffer + "] : Removing");
+        var index = activeSymbols.indexOf(symbol);
+        if (index > -1) {
+            activeSymbols.splice(index, 1);
         }
-        quoteData[symbol] = [];
-    });
+        return;
+    }
 
-    // Ensure the symbol is in our local object as well
-    // quoteData[symbol] = [];
+    yield stockObject.save();
+    Logging.log("       - [" + symbol + "] " + buffer);
+    quoteData[symbol] = [];
 });
 
 /**
@@ -354,16 +366,16 @@ var tradeAsync = co(function*() {
     // Bbb... Bbbbbb... Butttt Chandler, this isn't the right way to compare strings in JS! We don't need to
     // compare them strictly, because any change in the array should trigger the refresh, so it works.
 
-    // TODO: Fix this shitbucket
+    // Update the watchlist if it has changed
     if (JSON.stringify(activeSymbols) !== JSON.stringify(updatedSymbols)) {
         for (index in updatedSymbols) {
             // If the symbol isn't in the current list
             if (activeSymbols.indexOf(updatedSymbols[index]) === -1) {
-                yield initializeDataStorageForSymbolAsync(updatedSymbols[index], (yield tradier.getQuotesAsync(symbol)));
-                Logging.log("Now actively trading " + updatedSymbols[index]);
+                // yield initializeDataStorageForSymbolAsync(updatedSymbols[index], (yield tradier.getQuotesAsync(symbol)));
+                Logging.log("Detected watchlist change; this feature is not supported yet");
             }
         }
-        activeSymbols = updatedSymbols;
+        // activeSymbols = updatedSymbols;
     }
 
     // Loss-prevention feature

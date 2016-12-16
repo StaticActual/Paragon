@@ -39,25 +39,8 @@ module.exports.determineSell = function(quote, stockData) {
  * return 0.02 if the start point for the Divorce algorithm is supposed to be 2 cents 
  * lower than the share price.
  */
-module.exports.determineDivorceLowerAsync = co(function*(low, high) {
-    var ADR = yield Indicators.ADR(low, high);
-    var lower = ADRMultiplier * ADR + Offset;
-    return lower.toFixed(2);
-}); 
-
-// This function can be used to tune the Divorce algorithm constants
-    // Logging.log('Testing calculateLower()');
-    // var stocks = stockList.stocks;
-    // for (var stock in stocks) {
-    //     var quote = yield RobinhoodInterface.getQuote(stocks[stock]);
-    //     var lower = yield calculateLower(stocks[stock]);
-    //     var value = (quote - (yield calculateLower(stocks[stock]))).toFixed(2);
-    //     Logging.log(stocks[stock] + ' @ ' + quote + ':' + lower + ' = ' + value);
-    // }
-
-/**
- * Coroutine wrapper
- */
-function co(generator) {
-    return Promise.coroutine(generator);
-}
+module.exports.determineDivorceLower = function(low, high) {
+    var ADR = Indicators.ADR(low, high);
+    var lower = (ADRMultiplier * ADR + Offset).toFixed(2);
+    return lower;
+};
