@@ -23,5 +23,6 @@ module.exports.getShares = function(netCapital, tradingCapital, quote) {
  * Returns the balance we can trade with in one day.
  */
 module.exports.calculateTradingCapital = function(accountValue) {
+    // TODO: Modify this to reflect all cash availible
     return Math.floor(accountValue);
 };

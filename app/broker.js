@@ -317,8 +317,10 @@ var initializeDataStorageForSymbolAsync = co(function*(symbol, quote) {
 
     stockObject.save(function(err, product, numAffected) {
         if (err) {
-            console.log(err);		
--           console.log(product);
+            Logging.log("Error for " + symbol + " with buffer " + buffer);
+            Logging.logObject(quote);
+            Logging.log(err);		
+-           Logging.log(product);
         }
         quoteData[symbol] = [];
     });
@@ -351,11 +353,13 @@ var tradeAsync = co(function*() {
 
     // Bbb... Bbbbbb... Butttt Chandler, this isn't the right way to compare strings in JS! We don't need to
     // compare them strictly, because any change in the array should trigger the refresh, so it works.
+
+    // TODO: Fix this shitbucket
     if (JSON.stringify(activeSymbols) !== JSON.stringify(updatedSymbols)) {
         for (index in updatedSymbols) {
             // If the symbol isn't in the current list
             if (activeSymbols.indexOf(updatedSymbols[index]) === -1) {
-                yield initializeDataStorageForSymbolAsync(updatedSymbols[index]);
+                yield initializeDataStorageForSymbolAsync(updatedSymbols[index], (yield tradier.getQuotesAsync(symbol)));
                 Logging.log("Now actively trading " + updatedSymbols[index]);
             }
         }
