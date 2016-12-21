@@ -361,22 +361,22 @@ function firesale() {
  * Where the magic happens.
  */
 var tradeAsync = co(function*() {
-    var updatedSymbols = yield getWatchlistSymbolsAsync();
+    // var updatedSymbols = yield getWatchlistSymbolsAsync();
 
     // Bbb... Bbbbbb... Butttt Chandler, this isn't the right way to compare strings in JS! We don't need to
     // compare them strictly, because any change in the array should trigger the refresh, so it works.
 
     // Update the watchlist if it has changed
-    if (JSON.stringify(activeSymbols) !== JSON.stringify(updatedSymbols)) {
-        for (index in updatedSymbols) {
-            // If the symbol isn't in the current list
-            if (activeSymbols.indexOf(updatedSymbols[index]) === -1) {
-                // yield initializeDataStorageForSymbolAsync(updatedSymbols[index], (yield tradier.getQuotesAsync(symbol)));
-                Logging.log("Detected watchlist change; this feature is not supported yet");
-            }
-        }
-        // activeSymbols = updatedSymbols;
-    }
+    // if (JSON.stringify(activeSymbols) !== JSON.stringify(updatedSymbols)) {
+    //     for (index in updatedSymbols) {
+    //         // If the symbol isn't in the current list
+    //         if (activeSymbols.indexOf(updatedSymbols[index]) === -1) {
+    //             // yield initializeDataStorageForSymbolAsync(updatedSymbols[index], (yield tradier.getQuotesAsync(symbol)));
+    //             Logging.log("Detected watchlist change; this feature is not supported yet");
+    //         }
+    //     }
+    //     // activeSymbols = updatedSymbols;
+    // }
 
     // Loss-prevention feature
     if (netGain < -(totalAccountValue * MAX_LOSS)) {
