@@ -19,6 +19,14 @@
     "env_production" : {
       "NODE_ENV": "production",
       "NODE_DB": "mongodb://10.128.5.85/paragon"
+    },
+    "env_export-csv-dev" : {
+      "NODE_ENV": "export-csv-dev",
+      "NODE_DB": "mongodb://paragon_dev:paragon_dev@ds113668.mlab.com:13668/paragon_dev"
+    },
+    "env_export-csv-prod" : {
+      "NODE_ENV": "export-csv-prod",
+      "NODE_DB": "mongodb://10.128.5.85/paragon"
     }
   }],
   "deploy" : {

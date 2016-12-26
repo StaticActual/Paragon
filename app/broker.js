@@ -394,6 +394,9 @@ var tradeAsync = co(function*() {
         var stockObject = yield Stock.findOne({ 'symbol': symbol });
 
         // Store the new quote price in the local variable and the database
+        if (!quoteData.hasOwnProperty(symbol)) {
+            continue;
+        }
         quoteData[symbol].push(quote);
         stockObject.data[stockObject.data.length - 1].quotes.push(quote);
 

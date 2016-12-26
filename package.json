@@ -5,6 +5,8 @@
   "main": "paragon.js",
   "dependencies": {
     "bluebird": "latest",
+    "csv-stringify": "^1.0.4",
+    "fs-extra": "^1.0.0",
     "mongodb": "latest",
     "mongodb-core": "latest",
     "mongoose": "latest",

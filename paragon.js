@@ -9,7 +9,11 @@ Logging.logApplicationStartup();
 
 if (process.env.NODE_ENV === "testing") {
     runTests();
-} else {
+} 
+else if (process.env.NODE_ENV === "export-csv-dev") {
+    exportCSV();
+}
+else {
     // Fork the 'broker' process as a child.
     var broker = cp.fork('./app/broker.js');
     broker.on('args', function() {});
@@ -28,5 +32,12 @@ function runTests() {
         math_test.test();
         yield traider_test.test();
         yield indicator_test.test();
+    })();
+}
+
+function exportCSV() {
+    var exportCSVTool = require('./tools/export-csv');
+    Promise.coroutine(function*() {
+        yield exportCSVTool.exportCSV();
     })();
 }

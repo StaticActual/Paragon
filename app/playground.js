@@ -35,32 +35,15 @@ module.exports.playground = co(function*() {
     Logging.log('Playground');
     var tradier = new Tradier(Config.account, Config.token);
 
-    var stockObject = yield Stock.findOne({ 'symbol': "SPWR" });
-    if (!stockObject) {
-        stockObject = new Stock({ 'symbol': symbol });
-        stockObject.data = [];
+    var activeSymbols = ["AUY", "MU", "NM"];
+
+    Logging.log("       - Invalid buffer value for [" + "MU" + "]; Removing");
+    var index = activeSymbols.indexOf("MU");
+    if (index > -1) {
+        activeSymbols.splice(index, 1);
     }
 
-    // Create a subdocument for today's trading
-    stockObject.data.push({
-        quotes: [],
-        MACD: [],
-        BBAND: [],
-        RSI: [],
-        divorceLowerBound: [],
-        divorceBuffer: 0.02
-    });
-
-    // Replace with callback so we can check errors
-    // yield stockObject.save();
-    stockObject.save(function(err, product, numAffected) {
-        if (err) {
-            console.log(err);
-        }
-    });
-
-    // Ensure the symbol is in our local object as well
-    quoteData[symbol] = [];
+    Logging.log(activeSymbols);
 
     // var runThisCo = co(function*() {
     //     console.log("coFunc");
