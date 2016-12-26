@@ -10,7 +10,7 @@ Logging.logApplicationStartup();
 if (process.env.NODE_ENV === "testing") {
     runTests();
 } 
-else if (process.env.NODE_ENV === "export-csv-dev") {
+else if (process.env.NODE_ENV === "export-csv-dev" || process.env.NODE_ENV === "export-csv-prod") {
     exportCSV();
 }
 else {
